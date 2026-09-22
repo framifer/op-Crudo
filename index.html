@@ -185,6 +185,8 @@
       <button id="recBtn" class="rec" title="Rec">●</button>
       <button id="metroBtn" title="Metronomo">🔔</button>
       <button id="arpBtn" title="Arpeggiatore delle note suonate">ARP</button>
+      <button id="dlyBtn" title="Delay: tocca per ciclare off/1/2/3">DLY</button>
+      <button id="revBtn" title="Riverbero: tocca per ciclare off/1/2/3">REV</button>
       <div class="bpmbox"><button id="bpmDown">−</button><b id="bpmVal">120 BPM</b><button id="bpmUp">+</button></div>
       <button id="octDown" class="sp">8va −</button>
       <button id="octUp">8va +</button>
@@ -335,9 +337,9 @@ const State = {
   },
   // fx (global send)
   fx: {
-    delay: 20,          // %
+    delay: 0,           // % (DLY button cycles 0/30/55/80)
     delayTime: 3,       // 1..8 (sixteenths)
-    reverb: 25,         // %
+    reverb: 0,          // % (REV button cycles 0/35/65/95)
     drive: 0            // %
   },
   // tape (4-track recorder)
@@ -1053,6 +1055,7 @@ function refreshEncoders(){
     lbl.style.whiteSpace = 'pre';
   }
   if(typeof refreshNumRow==='function') refreshNumRow();
+  if(typeof refreshFxButtons==='function') refreshFxButtons();
 }
 function attachEncoders(){
   document.querySelectorAll('.knob').forEach(knob=>{
@@ -1524,6 +1527,37 @@ document.getElementById('arpBtn').addEventListener('click', ()=>{
   if(next===null){ Arp.setEnabled(false); btn.classList.remove('on'); btn.textContent='ARP'; toast('Arp off'); }
   else { State.arp.dir=next; Arp.setEnabled(true); btn.classList.add('on'); btn.textContent='ARP '+ARP_LABEL[next]; toast('Arp '+ARP_LABEL[next]); }
 });
+// DLY / REV quick buttons: cycle off -> 1 -> 2 -> 3 -> off (3 grades)
+const DELAY_GRADES = [0, 30, 55, 80];   // % per grade
+const REVERB_GRADES = [0, 35, 65, 95];
+function cycleFx(which){
+  AudioEngine.ensure(); AudioEngine.resume();
+  const grades = which==='delay' ? DELAY_GRADES : REVERB_GRADES;
+  const cur = which==='delay' ? State.fx.delay : State.fx.reverb;
+  // find nearest current grade, advance to next
+  let idx = grades.indexOf(cur);
+  if(idx < 0){ idx = 0; }               // if a custom value was set, restart cycle
+  const nidx = (idx+1) % grades.length;
+  const val = grades[nidx];
+  if(which==='delay') State.fx.delay = val; else State.fx.reverb = val;
+  FX.update();
+  const btn = document.getElementById(which==='delay'?'dlyBtn':'revBtn');
+  const label = which==='delay' ? 'DLY' : 'REV';
+  btn.classList.toggle('on', nidx>0);
+  btn.textContent = nidx>0 ? label+' '+nidx : label;
+  toast((which==='delay'?'Delay':'Riverbero')+' '+(nidx>0?('grado '+nidx):'off'));
+  refreshEncoders();
+}
+document.getElementById('dlyBtn').addEventListener('click', ()=>cycleFx('delay'));
+document.getElementById('revBtn').addEventListener('click', ()=>cycleFx('reverb'));
+function gradeOf(val, grades){ let g=0; for(let i=1;i<grades.length;i++){ if(val>=grades[i]-1) g=i; } return g; }
+function refreshFxButtons(){
+  const d = gradeOf(State.fx.delay, DELAY_GRADES);
+  const r = gradeOf(State.fx.reverb, REVERB_GRADES);
+  const db = document.getElementById('dlyBtn'), rb = document.getElementById('revBtn');
+  if(db){ db.classList.toggle('on', d>0); db.textContent = d>0?('DLY '+d):'DLY'; }
+  if(rb){ rb.classList.toggle('on', r>0); rb.textContent = r>0?('REV '+r):'REV'; }
+}
 function setBpm(v){ State.bpm = Math.max(40, Math.min(240, v)); document.getElementById('bpmVal').textContent = State.bpm+' BPM'; if(typeof FX!=='undefined') FX.update(); }
 document.getElementById('bpmUp').addEventListener('click', ()=>setBpm(State.bpm+1));
 document.getElementById('bpmDown').addEventListener('click', ()=>setBpm(State.bpm-1));
