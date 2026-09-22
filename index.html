@@ -87,6 +87,13 @@
   .numk.active span{opacity:.85;}
   .numk.on{background:var(--orange);color:#fff;border-color:#0003;}
 
+  /* DRUM mode: enlarge the drum pads (num row) and shrink the keyboard for more play space */
+  body[data-section="drum"] #numrow{height:clamp(46px, 22dvh, 92px);}
+  body[data-section="drum"] .numk{flex-direction:column;gap:2px;border-radius:9px;border-width:2px;}
+  body[data-section="drum"] .numk b{font-size:16px;}
+  body[data-section="drum"] .numk span{font-size:9px;opacity:.6;}
+  body[data-section="drum"] #kb{flex:0 0 auto;height:clamp(42px, 14dvh, 68px);min-height:42px;}
+
   /* bottom: keyboard */
   #bottom{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;margin-top:6px;}
   #kb{position:relative;flex:1 1 auto;min-height:48px;border-radius:8px;background:#bdb9b1;padding:5px;display:flex;gap:0;box-shadow:inset 0 2px 6px rgba(0,0,0,.3);}
@@ -131,6 +138,25 @@
   #projBox .prj button.del{color:#e5352b;}
   #projBox .empty{font-size:12px;opacity:.6;font-weight:700;text-align:center;padding:10px;}
 
+  /* Mixer dialog */
+  #mixDlg{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;background:rgba(10,10,14,.55);}
+  #mixDlg.show{display:flex;}
+  #mixBox{background:linear-gradient(180deg,#efeae2,#ded8cd);border:2px solid #0003;border-radius:14px;padding:12px;width:min(94vw,520px);max-height:88dvh;overflow:auto;box-shadow:0 8px 28px rgba(0,0,0,.45);}
+  #mixBox .mixhead{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-weight:900;font-size:15px;color:var(--ink);}
+  #mixBox .mixhead span{margin-right:auto;}
+  #mixBox #mixClose{border:2px solid #0003;background:#efece5;border-radius:7px;width:28px;height:28px;font-weight:800;cursor:pointer;}
+  #mixStrips{display:flex;gap:8px;justify-content:space-around;}
+  .mstrip{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;background:#fff8ea;border:2px solid #0003;border-radius:10px;padding:8px 5px;}
+  .mstrip .mt{font-size:12px;font-weight:900;color:var(--ink);}
+  .mstrip .vsl{writing-mode:vertical-lr;direction:rtl;width:28px;height:130px;accent-color:var(--orange);}
+  .mstrip .vval{font-size:9px;font-weight:800;opacity:.7;}
+  .mstrip .prow{width:100%;display:flex;flex-direction:column;align-items:center;gap:2px;}
+  .mstrip .prow input{width:100%;accent-color:var(--blue);}
+  .mstrip .plbl{font-size:9px;font-weight:800;opacity:.6;}
+  .mstrip .mbtn{border:2px solid #0003;background:#efece5;border-radius:6px;width:100%;height:26px;font-size:11px;font-weight:900;cursor:pointer;}
+  .mstrip .mbtn.on{background:var(--ink);color:#f4f1ea;border-color:#000;}
+  @media (max-height:520px){ .mstrip .vsl{height:90px;} }
+
   #toast{position:fixed;left:50%;bottom:6px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#f4f1ea;
     padding:6px 12px;border-radius:10px;font-size:11px;font-weight:700;z-index:60;opacity:0;transition:all .3s;pointer-events:none;max-width:90vw;text-align:center;}
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
@@ -169,6 +195,7 @@
     <div class="brand"><span class="dot"></span>op-Crudo</div>
     <div id="tabs">
       <button data-sec="synth" class="active">SYNTH</button>
+      <button data-sec="smpl">SMPL</button>
       <button data-sec="drum">DRUM</button>
       <button data-sec="tape">TAPE</button>
       <button data-sec="seq">SEQ</button>
@@ -206,12 +233,17 @@
       <button id="recBtn" class="rec" title="Rec">●</button>
       <button id="micBtn" title="Microfono: registra voce/suoni dal vivo">🎤</button>
       <button id="metroBtn" title="Metronomo">🔔</button>
+      <button id="countInBtn" title="Count-in: 1 battuta di conteggio prima del REC">1234</button>
       <button id="arpBtn" title="Arpeggiatore delle note suonate">ARP</button>
       <div class="bpmbox"><button id="bpmDown">−</button><input id="bpmInput" type="number" min="40" max="240" step="1" value="120" title="Digita i BPM" /><span class="bpmunit">BPM</span><button id="bpmUp">+</button></div>
       <button id="octDown" class="sp">8va −</button>
       <button id="octUp">8va +</button>
       <button id="saveBtn" title="Salva progetto (strumento, BPM, tracce, drum, seq, fx)">💾</button>
       <button id="loadBtn" title="Progetti salvati">📂</button>
+      <button id="mixBtn" title="Mixer (volume/pan/mute per traccia)">🎚</button>
+      <button id="copyBtn" title="Copia la traccia tape attiva">⧉Copy</button>
+      <button id="pasteBtn" title="Incolla/posa sulla traccia tape attiva">⇩Paste</button>
+      <button id="splitBtn" title="Split: attiva, poi tocca una traccia per dividerla e sollevare la parte dopo il taglio">✂Split</button>
       <button id="expWav" title="Esporta mix in WAV">⤓WAV</button>
       <button id="expMp3" title="Esporta mix in MP3">⤓MP3</button>
     </div>
@@ -223,6 +255,12 @@
   <div class="projhead"><span id="projTitle">Progetti salvati</span><button id="projClose">✕</button></div>
   <div class="projsaverow"><input id="projName" type="text" placeholder="Nome progetto" maxlength="40" /><button id="projSaveGo">💾 Salva</button></div>
   <div id="projList"></div>
+</div></div>
+
+<!-- Mixer dialog -->
+<div id="mixDlg"><div id="mixBox">
+  <div class="mixhead"><span>🎚 MIXER</span><button id="mixClose">✕</button></div>
+  <div id="mixStrips"></div>
 </div></div>
 
 <div id="toast"></div>
@@ -270,6 +308,7 @@ const AudioEngine = (() => {
         const outR = e.outputBuffer.getChannelData(1);
         outL.fill(0); outR.fill(0);
         if(typeof Tape!=='undefined' && Tape.capturing()) Tape.captureFrame(inL, inR);
+        if(typeof Sampler!=='undefined' && Sampler.capturing()) Sampler.captureFrame(inL, inR);
       };
       recMix.connect(tap);
       tap.connect(ctx.destination); // silent output; required to keep the node running
@@ -308,11 +347,20 @@ const AudioEngine = (() => {
 /* ---------- FX bus: delay + reverb + drive (global sends) ---------- */
 const FX = (() => {
   let ctx, master, delay, delayFb, delayWet, reverbConv, reverbWet, drive, driveWet, built=false;
+  let punchComp, punchWet, gridGain, gridLfo, gridLfoAmt, springConv, springWet, cwo, cwoFb, cwoWet, cwoLfo, cwoLfoAmt;
   function makeImpulse(seconds, decay){
     const rate = ctx.sampleRate, len = rate*seconds;
     const imp = ctx.createBuffer(2, len, rate);
     for(let c=0;c<2;c++){ const d = imp.getChannelData(c);
       for(let i=0;i<len;i++) d[i] = (Math.random()*2-1)*Math.pow(1-i/len, decay); }
+    return imp;
+  }
+  function makeSpringImpulse(){
+    // short, bright, "boingy" impulse for a spring-reverb character
+    const rate=ctx.sampleRate, len=Math.floor(rate*0.6);
+    const imp=ctx.createBuffer(2,len,rate);
+    for(let c=0;c<2;c++){ const d=imp.getChannelData(c);
+      for(let i=0;i<len;i++){ const env=Math.pow(1-i/len,2.5); const wobble=Math.sin(i/rate*2*Math.PI*(180+40*Math.sin(i/rate*30))); d[i]=(wobble*0.6+(Math.random()*2-1)*0.4)*env; } }
     return imp;
   }
   function build(context, masterNode){
@@ -326,12 +374,37 @@ const FX = (() => {
     reverbConv = ctx.createConvolver(); reverbConv.buffer = makeImpulse(2.2, 3);
     reverbWet = ctx.createGain(); reverbWet.gain.value = 0;
     reverbConv.connect(reverbWet); reverbWet.connect(ctx.destination);
-    // drive (waveshaper) applied on the master's own path via a parallel send
+    // drive (waveshaper) parallel send
     drive = ctx.createWaveShaper();
     driveWet = ctx.createGain(); driveWet.gain.value = 0;
     drive.connect(driveWet); driveWet.connect(ctx.destination);
+    // --- signature effects ---
+    // PUNCH: parallel compressor + makeup for presence/impact
+    punchComp = ctx.createDynamicsCompressor();
+    punchComp.threshold.value=-28; punchComp.ratio.value=8; punchComp.attack.value=0.002; punchComp.release.value=0.12;
+    punchWet = ctx.createGain(); punchWet.gain.value=0;
+    punchComp.connect(punchWet); punchWet.connect(ctx.destination);
+    // GRID: rhythmic tremolo/gate synced to tempo (LFO modulates a gain)
+    gridGain = ctx.createGain(); gridGain.gain.value=1;
+    gridLfo = ctx.createOscillator(); gridLfo.type='square'; gridLfo.frequency.value=8;
+    gridLfoAmt = ctx.createGain(); gridLfoAmt.gain.value=0; // depth
+    gridLfo.connect(gridLfoAmt); gridLfoAmt.connect(gridGain.gain);
+    gridGain.connect(ctx.destination); gridLfo.start();
+    // SPRING: short bright convolver
+    springConv = ctx.createConvolver(); springConv.buffer = makeSpringImpulse();
+    springWet = ctx.createGain(); springWet.gain.value=0;
+    springConv.connect(springWet); springWet.connect(ctx.destination);
+    // CWO: modulated delay (chorus-ish) with feedback
+    cwo = ctx.createDelay(0.1); cwo.delayTime.value=0.03;
+    cwoFb = ctx.createGain(); cwoFb.gain.value=0.35;
+    cwoWet = ctx.createGain(); cwoWet.gain.value=0;
+    cwoLfo = ctx.createOscillator(); cwoLfo.type='sine'; cwoLfo.frequency.value=0.6;
+    cwoLfoAmt = ctx.createGain(); cwoLfoAmt.gain.value=0.008;
+    cwoLfo.connect(cwoLfoAmt); cwoLfoAmt.connect(cwo.delayTime);
+    cwo.connect(cwoFb); cwoFb.connect(cwo); cwo.connect(cwoWet); cwoWet.connect(ctx.destination); cwoLfo.start();
     // feed sends from master
     master.connect(delay); master.connect(reverbConv); master.connect(drive);
+    master.connect(punchComp); master.connect(gridGain); master.connect(springConv); master.connect(cwo);
     built = true; update();
   }
   function makeCurve(amount){
@@ -348,6 +421,16 @@ const FX = (() => {
     reverbWet.gain.value = f.reverb/100 * 0.9;
     drive.curve = makeCurve(f.drive/100);
     driveWet.gain.value = f.drive/100 * 0.5;
+    // signature effects
+    punchWet.gain.value = (f.punch||0)/100 * 0.9;
+    // grid: rate synced to tempo (16th notes), depth from amount
+    const g=(f.grid||0)/100;
+    gridLfo.frequency.value = (State.bpm/60)*4;   // 1/16 rate
+    gridLfoAmt.gain.value = g*0.5;                // modulation depth
+    gridGain.gain.value = 1 - g*0.0;              // baseline
+    springWet.gain.value = (f.spring||0)/100 * 0.8;
+    cwoWet.gain.value = (f.cwo||0)/100 * 0.7;
+    cwoLfoAmt.gain.value = (f.cwo||0)/100 * 0.006;
   }
   return { build, update };
 })();
@@ -365,6 +448,7 @@ const State = {
   playing: false,
   recording: false,
   metro: false,
+  countIn: false,       // 1-bar count-in before tape recording
   // synth params (controlled by encoders)
   synth: {
     engine: 'saw',      // saw | square | sine | fm
@@ -399,16 +483,21 @@ const State = {
     delay: 0,           // % (DLY button cycles 0/30/55/80)
     delayTime: 3,       // 1..8 (sixteenths)
     reverb: 0,          // % (REV button cycles 0/35/65/95)
-    drive: 0            // %
+    drive: 0,           // %
+    // OP-1 "signature" effects (0..100 each)
+    punch: 0,           // compressor/enhancer punch
+    grid: 0,            // rhythmic gate/tremolo synced to tempo
+    spring: 0,          // spring reverb
+    cwo: 0              // modulated delay (chorus-ish)
   },
   // tape (4-track recorder)
   tape: {
     activeTrack: 0,     // 0..3 currently selected/armed track
     tracks: [           // each: {buffer, mute, vol, offset(sec)}
-      {buffer:null, mute:false, vol:90, offset:0},
-      {buffer:null, mute:false, vol:90, offset:0},
-      {buffer:null, mute:false, vol:90, offset:0},
-      {buffer:null, mute:false, vol:90, offset:0}
+      {buffer:null, mute:false, vol:90, offset:0, rate:1, reverse:false, pan:0},
+      {buffer:null, mute:false, vol:90, offset:0, rate:1, reverse:false, pan:0},
+      {buffer:null, mute:false, vol:90, offset:0, rate:1, reverse:false, pan:0},
+      {buffer:null, mute:false, vol:90, offset:0, rate:1, reverse:false, pan:0}
     ]
   },
   // arpeggiator (applies to notes held on the keyboard)
@@ -417,6 +506,15 @@ const State = {
     dir: 'up',          // up | down | updown | random
     rate: 16,           // 8 | 16 | 32 (note division)
     octaves: 1          // 1 | 2
+  },
+  // sampler: record a short sound, play it chromatically across the keyboard
+  sampler: {
+    buffer: null,       // recorded AudioBuffer
+    baseNote: 60,       // MIDI note that plays at original pitch (C4)
+    start: 0,           // 0..1 fraction of sample start
+    end: 1,             // 0..1 fraction of sample end
+    attack: 0.005,
+    release: 0.25
   }
 };
 
@@ -454,6 +552,24 @@ class SynthVoice {
       carrier.connect(this.filter);
       carrier.start(now); mod.start(now);
       this.nodes.push(carrier, mod);
+    } else if(p.engine === 'pulse'){
+      // PWM-style: two squares slightly detuned + a slow LFO on detune for movement
+      const o1 = ctx.createOscillator(); o1.type='square'; o1.frequency.value=freq;
+      const o2 = ctx.createOscillator(); o2.type='square'; o2.frequency.value=freq; o2.detune.value=12;
+      const lfo = ctx.createOscillator(); lfo.type='sine'; lfo.frequency.value=0.8;
+      const lfoGain = ctx.createGain(); lfoGain.gain.value=18;
+      lfo.connect(lfoGain); lfoGain.connect(o2.detune);
+      o1.connect(this.filter); o2.connect(this.filter);
+      o1.start(now); o2.start(now); lfo.start(now);
+      this.nodes.push(o1,o2,lfo);
+    } else if(p.engine === 'string'){
+      // ensemble of detuned sawtooths -> lush string/pad
+      const detunes=[-14,-6,0,6,14];
+      detunes.forEach(dt=>{ const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=freq; o.detune.value=dt; o.connect(this.filter); o.start(now); this.nodes.push(o); });
+    } else if(p.engine === 'cluster'){
+      // stacked oscillators at cluster intervals (root, +3, +7, +10, +12) -> dense
+      const semis=[0,3,7,10,12];
+      semis.forEach((s,idx)=>{ const o=ctx.createOscillator(); o.type= idx%2?'triangle':'sawtooth'; o.frequency.value=freq*Math.pow(2,s/12); o.detune.value=(idx-2)*4; o.connect(this.filter); o.start(now); this.nodes.push(o); });
     } else {
       const osc = ctx.createOscillator();
       osc.type = p.engine === 'saw' ? 'sawtooth' : (p.engine === 'square' ? 'square' : 'sine');
@@ -476,10 +592,11 @@ class SynthVoice {
     this.filter.connect(this.out);
     this.out.connect(AudioEngine.master);
 
-    // amp envelope (attack)
+    // amp envelope (attack) — lower level for multi-oscillator engines to avoid clipping
+    const peakLvl = (p.engine==='string'||p.engine==='cluster') ? 0.12 : (p.engine==='pulse'?0.16:0.22);
     this.out.gain.cancelScheduledValues(now);
     this.out.gain.setValueAtTime(0, now);
-    this.out.gain.linearRampToValueAtTime(0.22, now + p.attack);
+    this.out.gain.linearRampToValueAtTime(peakLvl, now + p.attack);
     this.released = false;
   }
   release(){
@@ -496,14 +613,54 @@ class SynthVoice {
   }
 }
 
+/* ---------- Sampler voice: plays the recorded sample pitched per key ---------- */
+class SamplerVoice {
+  constructor(midi){
+    const ctx = AudioEngine.ctx;
+    const sp = State.sampler;
+    this.midi = midi;
+    const now = ctx.currentTime;
+    this.out = ctx.createGain(); this.out.gain.value = 0;
+    this.src = ctx.createBufferSource();
+    this.src.buffer = sp.buffer;
+    // pitch: semitone distance from base note -> playbackRate, plus octave transpose
+    const semis = (midi + State.octave*12) - sp.baseNote;
+    this.src.playbackRate.value = Math.pow(2, semis/12);
+    this.src.connect(this.out);
+    this.out.connect(AudioEngine.master);
+    // start/end region
+    const dur = sp.buffer.duration;
+    const s = Math.max(0, Math.min(sp.start, sp.end)) * dur;
+    const e = Math.min(1, Math.max(sp.start, sp.end)) * dur;
+    const playLen = Math.max(0.02, e - s);
+    this.out.gain.setValueAtTime(0, now);
+    this.out.gain.linearRampToValueAtTime(0.9, now + sp.attack);
+    this.src.start(now, s, playLen / this.src.playbackRate.value);
+    this.released = false;
+  }
+  release(){
+    if(this.released) return; this.released = true;
+    const ctx = AudioEngine.ctx, now = ctx.currentTime, rel = State.sampler.release;
+    this.out.gain.cancelScheduledValues(now);
+    this.out.gain.setValueAtTime(this.out.gain.value, now);
+    this.out.gain.linearRampToValueAtTime(0.0001, now + rel);
+    try{ this.src.stop(now + rel + 0.05); }catch(e){}
+  }
+}
+
 /* ---------- Voice manager ---------- */
 const Voices = {
   active: new Map(),   // midi -> voice
+  makeVoice(midi){
+    if(State.section==='smpl' && State.sampler.buffer){ return new SamplerVoice(midi); }
+    return new SynthVoice(midi);
+  },
   noteOn(midi){
     AudioEngine.ensure(); AudioEngine.resume();
+    if(State.section==='smpl' && !State.sampler.buffer){ toast('Registra prima un campione (● in SMPL)'); return; }
     if(State.arp.on){ Arp.hold(midi); Display.flashNote(midi); return; }
     if(this.active.has(midi)) return;
-    const v = new SynthVoice(midi);
+    const v = this.makeVoice(midi);
     this.active.set(midi, v);
     Display.flashNote(midi);
   },
@@ -515,7 +672,7 @@ const Voices = {
   // play a short one-shot note (used by the arpeggiator)
   pluck(midi){
     AudioEngine.ensure();
-    const v = new SynthVoice(midi);
+    const v = this.makeVoice(midi);
     const dur = Arp.stepSeconds()*0.9;
     setTimeout(()=>v.release(), Math.max(60, dur*1000));
     Display.flashNote(midi);
@@ -693,12 +850,6 @@ const Sequencer = (() => {
       // finger: only manual pattern notes, but repeated as a roll on beats
       if(sp.pattern[step] && sp.pattern[step].length) sp.pattern[step].forEach(m=>playSeqNote(m, time+sw));
     }
-    // Metronome
-    if(State.metro && step%4===0){
-      const ctx = AudioEngine.ctx; const o=ctx.createOscillator(); const g=ctx.createGain();
-      o.frequency.value = step===0?1600:1000; g.gain.setValueAtTime(0.2,time); g.gain.exponentialRampToValueAtTime(0.001,time+0.05);
-      o.connect(g); g.connect(AudioEngine.master); o.start(time); o.stop(time+0.06);
-    }
   }
   function tick(){
     const ctx = AudioEngine.ctx;
@@ -721,6 +872,39 @@ const Sequencer = (() => {
     stop(){ if(timerId){ clearTimeout(timerId); timerId=null; } current=0; this.uiStep=0; },
     get running(){ return !!timerId; }
   };
+})();
+
+/* ---------- Metronome: independent clock, monitor-only (never recorded) ---------- */
+const Metro = (() => {
+  let timerId=null, nextT=0, beat=0;
+  const LOOKAHEAD=0.025, AHEAD=0.12;
+  function beatDur(){ return 60/State.bpm; }
+  function click(time, accent){
+    const ctx=AudioEngine.ctx; if(!ctx) return;
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.frequency.value = accent?1600:1000;
+    g.gain.setValueAtTime(0.2,time); g.gain.exponentialRampToValueAtTime(0.001,time+0.05);
+    o.connect(g); g.connect(AudioEngine.monitorBus || AudioEngine.master);
+    o.start(time); o.stop(time+0.06);
+  }
+  function tick(){
+    const ctx=AudioEngine.ctx;
+    while(nextT < ctx.currentTime + AHEAD){
+      click(nextT, beat%4===0);
+      nextT += beatDur(); beat=(beat+1)%4;
+    }
+    timerId=setTimeout(tick, LOOKAHEAD*1000);
+  }
+  function start(){ AudioEngine.ensure(); AudioEngine.resume(); if(timerId) return; beat=0; nextT=AudioEngine.ctx.currentTime+0.05; tick(); }
+  function stop(){ if(timerId){ clearTimeout(timerId); timerId=null; } beat=0; }
+  // count-in: schedule one bar (4 beats) of clicks, then fire the callback on the downbeat
+  function countIn(cb){
+    const ctx=AudioEngine.ensure(); AudioEngine.resume();
+    const t0=ctx.currentTime+0.06, bd=beatDur();
+    for(let i=0;i<4;i++) click(t0+i*bd, i===0);
+    setTimeout(cb, (4*bd)*1000);
+  }
+  return { start, stop, countIn, get running(){ return !!timerId; } };
 })();
 
 /* ---------- Tape: 4-track recorder ----------
@@ -809,14 +993,27 @@ const Tape = (() => {
       if(!t.buffer || t.mute) return;
       if(excludeTrack!==undefined && i===excludeTrack) return; // don't monitor the track being recorded
       const src = ctx.createBufferSource();
-      src.buffer = t.buffer; src.loop = true;
+      src.buffer = t.reverse ? reversedBuffer(t.buffer) : t.buffer;
+      src.loop = true;
+      src.playbackRate.value = t.rate || 1;   // 0.5 = half, 1 = normal, 2 = double speed
       const g = ctx.createGain(); g.gain.value = t.vol/100;
-      src.connect(g); g.connect(dest);
+      if(ctx.createStereoPanner){ const pan=ctx.createStereoPanner(); pan.pan.value=Math.max(-1,Math.min(1,t.pan||0)); src.connect(pan); pan.connect(g); }
+      else { src.connect(g); }
+      g.connect(dest);
       const off = t.offset||0;
       if(off >= 0){ src.start(startAt + off); }
       else { src.start(startAt, Math.min(-off, t.buffer.duration-0.01)); }
       playSources.push(src);
     });
+  }
+  function reversedBuffer(buf){
+    const ctx = AudioEngine.ensure();
+    const nb = ctx.createBuffer(buf.numberOfChannels, buf.length, buf.sampleRate);
+    for(let c=0;c<buf.numberOfChannels;c++){
+      const s=buf.getChannelData(c), d=nb.getChannelData(c), n=buf.length;
+      for(let i=0;i<n;i++) d[i]=s[n-1-i];
+    }
+    return nb;
   }
   function stopPlay(){
     playSources.forEach(s=>{ try{s.stop();}catch(e){} });
@@ -828,8 +1025,115 @@ const Tape = (() => {
   }
   function clearTrack(track){ State.tape.tracks[track].buffer = null; State.tape.tracks[track].offset=0; toast('Traccia '+(track+1)+' svuotata'); }
   function hasAudio(){ return State.tape.tracks.some(t=>t.buffer); }
+  // ---- copy / paste ----
+  let clipboard = null; // {buffer, vol, offset}
+  function cloneBuffer(buf){
+    const ctx = AudioEngine.ensure();
+    const nb = ctx.createBuffer(buf.numberOfChannels, buf.length, buf.sampleRate);
+    for(let c=0;c<buf.numberOfChannels;c++){ nb.getChannelData(c).set(buf.getChannelData(c)); }
+    return nb;
+  }
+  function copyTrack(track){
+    const t = State.tape.tracks[track];
+    if(!t.buffer){ toast('T'+(track+1)+' è vuota'); return false; }
+    clipboard = { buffer: cloneBuffer(t.buffer), vol: t.vol, offset: t.offset };
+    toast('T'+(track+1)+' copiata'); return true;
+  }
+  function concatBuffers(a, b){
+    const ctx = AudioEngine.ensure();
+    const ch = Math.max(a.numberOfChannels, b.numberOfChannels);
+    const len = a.length + b.length;
+    const out = ctx.createBuffer(ch, len, a.sampleRate);
+    for(let c=0;c<ch;c++){
+      const od = out.getChannelData(c);
+      const ad = a.getChannelData(Math.min(c, a.numberOfChannels-1));
+      const bd = b.getChannelData(Math.min(c, b.numberOfChannels-1));
+      od.set(ad, 0); od.set(bd, a.length);
+    }
+    return out;
+  }
+  function pasteTrack(track){
+    if(!clipboard){ toast('Niente da incollare (copia prima)'); return false; }
+    const t = State.tape.tracks[track];
+    const clip = cloneBuffer(clipboard.buffer);
+    if(t.buffer){
+      // APPEND after the existing (bar-aligned) audio -> the copy starts exactly
+      // where the original ends, so you always know start/end and it stays in time.
+      t.buffer = concatBuffers(t.buffer, clip);
+      toast('Copia accodata a T'+(track+1)+' ('+t.buffer.duration.toFixed(1)+'s)');
+    } else {
+      t.buffer = clip; t.offset = clipboard.offset || 0;
+      toast('Incollata su T'+(track+1));
+    }
+    if(playing) startPlay();
+    return true;
+  }
+  function hasClipboard(){ return !!clipboard; }
+  // SPLIT + LIFT: cut the track at `frac` (0..1). Keep the first part on the track,
+  // put the second part into the clipboard so you can DROP (paste) it on any track.
+  function splitLift(track, frac){
+    const t = State.tape.tracks[track];
+    if(!t.buffer){ toast('T'+(track+1)+' è vuota'); return false; }
+    const ctx = AudioEngine.ensure();
+    const total = t.buffer.length;
+    let cut = Math.round(frac*total);
+    cut = Math.max(1, Math.min(total-1, cut));
+    const ch = t.buffer.numberOfChannels, sr = t.buffer.sampleRate;
+    const a = ctx.createBuffer(ch, cut, sr);          // first part (stays)
+    const b = ctx.createBuffer(ch, total-cut, sr);    // second part (lifted)
+    for(let c=0;c<ch;c++){ const src=t.buffer.getChannelData(c);
+      a.getChannelData(c).set(src.subarray(0,cut));
+      b.getChannelData(c).set(src.subarray(cut)); }
+    t.buffer = a;
+    clipboard = { buffer: b, vol: t.vol, offset: 0 };
+    toast('T'+(track+1)+' divisa — porzione sollevata (usa ⇩Paste per posarla)');
+    if(playing) startPlay();
+    return true;
+  }
   return { startRec, stopRec, isRecording, isArmed, capturing, captureFrame, diag, startPlay, stopPlay, toggleTrackRec, clearTrack, hasAudio,
+    copyTrack, pasteTrack, hasClipboard, splitLift,
     get recTrack(){ return recTrack; }, get playing(){ return playing; } };
+})();
+
+/* ---------- Sampler recorder: capture a short sample to play chromatically ---------- */
+const Sampler = (() => {
+  let capturingFlag=false, armed=false;
+  let capL=[], capR=[], capLen=0, peak=0;
+  const MAX_SECONDS = 6;             // samples are short
+  const START_THRESHOLD = 0.01;
+  function capturing(){ return capturingFlag || armed; }
+  function isRecording(){ return capturingFlag || armed; }
+  function frameMax(inL){ let m=0; for(let i=0;i<inL.length;i+=8){ const a=Math.abs(inL[i]); if(a>m)m=a; } return m; }
+  function captureFrame(inL, inR){
+    const fmax = frameMax(inL);
+    if(armed && !capturingFlag){ if(fmax < START_THRESHOLD) return; capturingFlag=true; }
+    if(!capturingFlag) return;
+    if(fmax>peak) peak=fmax;
+    capL.push(new Float32Array(inL)); capR.push(new Float32Array(inR)); capLen+=inL.length;
+    if(capLen > AudioEngine.ctx.sampleRate*MAX_SECONDS){ stopRec(); }
+  }
+  function startRec(){
+    AudioEngine.ensure(); AudioEngine.resume();
+    if(capturingFlag||armed) stopRec();
+    capL=[]; capR=[]; capLen=0; peak=0; armed=true; capturingFlag=false;
+    toast('Campione: parla/suona… (● per fermare)');
+  }
+  function stopRec(){
+    if(!capturingFlag && !armed) return;
+    const wasCap=capturingFlag; capturingFlag=false; armed=false;
+    if(!wasCap || capLen===0){ toast('Nessun campione catturato'); return; }
+    const ctx=AudioEngine.ctx;
+    const buf=ctx.createBuffer(2, capLen, ctx.sampleRate);
+    const dL=buf.getChannelData(0), dR=buf.getChannelData(1);
+    let off=0; for(let i=0;i<capL.length;i++){ dL.set(capL[i],off); dR.set(capR[i],off); off+=capL[i].length; }
+    State.sampler.buffer=buf; State.sampler.start=0; State.sampler.end=1;
+    toast('Campione pronto ('+buf.duration.toFixed(1)+'s) — suonalo sui tasti');
+    capL=[]; capR=[]; capLen=0;
+  }
+  function toggleRec(){ if(capturingFlag||armed) stopRec(); else startRec(); }
+  function clear(){ State.sampler.buffer=null; toast('Campione cancellato'); }
+  function has(){ return !!State.sampler.buffer; }
+  return { capturing, isRecording, captureFrame, startRec, stopRec, toggleRec, clear, has };
 })();
 
 /* ---------- Export: mixdown tape tracks and encode WAV / MP3 ---------- */
@@ -838,16 +1142,26 @@ const Export = (() => {
   async function mixdown(){
     const live = AudioEngine.ensure();
     const sr = live.sampleRate;
+    const effDur = t => (t.buffer.duration / (t.rate||1)) + Math.max(0, t.offset);
     let total = 0;
-    State.tape.tracks.forEach(t=>{ if(t.buffer && !t.mute) total = Math.max(total, t.buffer.duration + Math.max(0,t.offset)); });
+    State.tape.tracks.forEach(t=>{ if(t.buffer && !t.mute) total = Math.max(total, effDur(t)); });
     if(total <= 0) return null;
     const len = Math.ceil(total * sr) + 1;
     const off = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, len, sr);
+    function reversedBuf(buf){
+      const nb = off.createBuffer(buf.numberOfChannels, buf.length, buf.sampleRate);
+      for(let c=0;c<buf.numberOfChannels;c++){ const s=buf.getChannelData(c),d=nb.getChannelData(c),n=buf.length; for(let i=0;i<n;i++) d[i]=s[n-1-i]; }
+      return nb;
+    }
     State.tape.tracks.forEach(t=>{
       if(!t.buffer || t.mute) return;
-      const src = off.createBufferSource(); src.buffer = t.buffer;
+      const src = off.createBufferSource();
+      src.buffer = t.reverse ? reversedBuf(t.buffer) : t.buffer;
+      src.playbackRate.value = t.rate || 1;
       const g = off.createGain(); g.gain.value = t.vol/100;
-      src.connect(g); g.connect(off.destination);
+      if(off.createStereoPanner){ const pan=off.createStereoPanner(); pan.pan.value=Math.max(-1,Math.min(1,t.pan||0)); src.connect(pan); pan.connect(g); }
+      else { src.connect(g); }
+      g.connect(off.destination);
       const o = t.offset||0;
       if(o>=0) src.start(o); else src.start(0, Math.min(-o, t.buffer.duration-0.001));
     });
@@ -976,7 +1290,8 @@ const Project = (() => {
              pattern: JSON.parse(JSON.stringify(State.seq.pattern)) },
       fx: JSON.parse(JSON.stringify(State.fx)),
       arp: JSON.parse(JSON.stringify(State.arp)),
-      tape: State.tape.tracks.map(t=>({ mute:t.mute, vol:t.vol, offset:t.offset, audio: t.buffer? bufToData(t.buffer):null }))
+      tape: State.tape.tracks.map(t=>({ mute:t.mute, vol:t.vol, offset:t.offset, rate:t.rate, reverse:t.reverse, pan:t.pan, audio: t.buffer? bufToData(t.buffer):null })),
+      sampler: { baseNote:State.sampler.baseNote, start:State.sampler.start, end:State.sampler.end, attack:State.sampler.attack, release:State.sampler.release, audio: State.sampler.buffer? bufToData(State.sampler.buffer):null }
     };
   }
   function apply(p){
@@ -990,11 +1305,13 @@ const Project = (() => {
     State.seq.pattern = p.seq.pattern;
     Object.assign(State.fx, p.fx||{});
     Object.assign(State.arp, p.arp||{});
+    if(p.sampler){ Object.assign(State.sampler, { baseNote:p.sampler.baseNote, start:p.sampler.start, end:p.sampler.end, attack:p.sampler.attack, release:p.sampler.release }); State.sampler.buffer = p.sampler.audio ? dataToBuf(p.sampler.audio) : null; }
     // tape
     Tape.stopPlay();
     (p.tape||[]).forEach((t,i)=>{
       if(i>3) return;
       State.tape.tracks[i].mute = t.mute; State.tape.tracks[i].vol = t.vol; State.tape.tracks[i].offset = t.offset||0;
+      State.tape.tracks[i].rate = t.rate||1; State.tape.tracks[i].reverse = !!t.reverse; State.tape.tracks[i].pan = t.pan||0;
       State.tape.tracks[i].buffer = t.audio ? dataToBuf(t.audio) : null;
     });
     if(typeof FX!=='undefined') FX.update();
@@ -1195,14 +1512,21 @@ function highlightKey(midi, on){
 }
 
 /* ---------- Encoders ---------- */
-const ENGINES = ['saw','square','sine','fm'];
+const ENGINES = ['saw','square','sine','fm','pulse','string','cluster'];
+const ENGINE_LABELS = {saw:'Saw',square:'Square',sine:'Sine',fm:'FM',pulse:'Pulse',string:'String',cluster:'Cluster'};
 const SEQ_MODES = ['off','pattern','endless','finger','tombola'];
 const ENC_CONFIG = {
   synth: [
-    { get:()=>ENGINES.indexOf(State.synth.engine), set:v=>State.synth.engine=ENGINES[Math.round(v)], label:'Engine', min:0, max:3, step:1, fmt:v=>['Saw','Square','Sine','FM'][Math.round(v)] },
+    { get:()=>ENGINES.indexOf(State.synth.engine), set:v=>State.synth.engine=ENGINES[Math.round(v)], label:'Engine', min:0, max:ENGINES.length-1, step:1, fmt:v=>ENGINE_LABELS[ENGINES[Math.round(v)]] },
     { get:()=>State.synth.cutoff, set:v=>State.synth.cutoff=v, label:'Cutoff', min:200, max:8000, step:50, fmt:v=>Math.round(v)+'Hz' },
     { get:()=>State.synth.reso, set:v=>State.synth.reso=v, label:'Reso', min:0.5, max:20, step:0.5, fmt:v=>v.toFixed(1) },
     { get:()=>State.synth.release, set:v=>State.synth.release=v, label:'Release', min:0.05, max:2, step:0.05, fmt:v=>v.toFixed(2)+'s' }
+  ],
+  smpl: [
+    { get:()=>State.sampler.baseNote, set:v=>State.sampler.baseNote=Math.round(v), label:'Base', min:36, max:84, step:1, fmt:v=>midiName(Math.round(v)) },
+    { get:()=>State.sampler.start, set:v=>State.sampler.start=v, label:'Start', min:0, max:1, step:0.01, fmt:v=>Math.round(v*100)+'%' },
+    { get:()=>State.sampler.end, set:v=>State.sampler.end=v, label:'End', min:0, max:1, step:0.01, fmt:v=>Math.round(v*100)+'%' },
+    { get:()=>State.sampler.release, set:v=>State.sampler.release=v, label:'Release', min:0.02, max:2, step:0.02, fmt:v=>v.toFixed(2)+'s' }
   ],
   drum: [
     { get:()=>DRUMS.indexOf(State.drum.selected), set:v=>State.drum.selected=DRUMS[Math.round(v)], label:'Voice', min:0, max:DRUMS.length-1, step:1, fmt:v=>DRUM_LABELS[DRUMS[Math.round(v)]] },
@@ -1293,14 +1617,14 @@ const Display = (() => {
   }
   function flashNote(midi){ flashes.push({midi, t:performance.now()}); }
   function sectionColor(){
-    return ({synth:'#f0821e',drum:'#2f6df0',tape:'#37c26b',seq:'#f4f1ea',fx:'#e5352b'})[State.section] || '#f0821e';
+    return ({synth:'#f0821e',smpl:'#c77dff',drum:'#2f6df0',tape:'#37c26b',seq:'#f4f1ea',fx:'#e5352b'})[State.section] || '#f0821e';
   }
   function draw(){
     if(!cx){ resize(); }
     const now = performance.now();
     // keep REC button in sync with the recorder in any section
     const _recBtn = document.getElementById('recBtn');
-    const _recOn = Tape.isRecording();
+    const _recOn = Tape.isRecording() || (typeof Sampler!=='undefined' && Sampler.isRecording());
     if(_recBtn && _recBtn.classList.contains('on') !== _recOn){ _recBtn.classList.toggle('on', _recOn); State.recording=_recOn; }
     cx.clearRect(0,0,W,H);
     // background
@@ -1331,6 +1655,8 @@ const Display = (() => {
       drawFx(now, col);
     } else if(State.section === 'tape'){
       drawTape(now, col);
+    } else if(State.section === 'smpl'){
+      drawSmpl(now, col);
     } else {
       cx.fillStyle='rgba(255,255,255,.35)'; cx.font='600 11px monospace';
       cx.fillText('(in arrivo)', 6, H/2);
@@ -1392,20 +1718,24 @@ const Display = (() => {
   }
   function drawFx(now, col){
     const f = State.fx;
-    const items = [['Reverb',f.reverb,'%'],['Delay',f.delay,'%'],['DlyTime','1/'+(16/f.delayTime).toFixed(0),''],['Drive',f.drive,'%']];
-    const x0=6, y0=26, gw=W-12;
-    const rowH = (H-30)/4;
-    items.forEach((it,i)=>{
-      const y = y0 + i*rowH;
-      cx.fillStyle='rgba(255,255,255,.6)'; cx.font='600 9px monospace';
-      cx.fillText(it[0], x0, y+3);
-      const bx=x0+52, bw=gw-80;
-      cx.fillStyle='rgba(255,255,255,.1)'; cx.fillRect(bx,y-5,bw,10);
-      const val = typeof it[1]==='number'? it[1]/100 : (f.delayTime/8);
-      cx.fillStyle=col; cx.fillRect(bx,y-5,bw*val,10);
-      cx.fillStyle='rgba(255,255,255,.75)'; cx.font='600 9px monospace'; cx.textAlign='right';
-      cx.fillText((typeof it[1]==='number'?Math.round(it[1]):it[1])+it[2], W-6, y+3); cx.textAlign='left';
-    });
+    const left = [['Reverb',f.reverb,'%'],['Delay',f.delay,'%'],['DlyTime','1/'+(16/f.delayTime).toFixed(0),''],['Drive',f.drive,'%']];
+    const right = [['Punch',f.punch,'%'],['Grid',f.grid,'%'],['Spring',f.spring,'%'],['CWO',f.cwo,'%']];
+    const y0=24, rowH=(H-28)/4, colW=(W-18)/2;
+    function drawCol(items, cx0){
+      items.forEach((it,i)=>{
+        const y=y0+i*rowH;
+        cx.fillStyle='rgba(255,255,255,.6)'; cx.font='600 8px monospace';
+        cx.fillText(it[0], cx0, y+2);
+        const bx=cx0+42, bw=colW-64;
+        cx.fillStyle='rgba(255,255,255,.1)'; cx.fillRect(bx,y-4,bw,8);
+        const val = typeof it[1]==='number'? it[1]/100 : (f.delayTime/8);
+        cx.fillStyle=col; cx.fillRect(bx,y-4,bw*Math.min(1,val),8);
+        cx.fillStyle='rgba(255,255,255,.7)'; cx.font='600 8px monospace'; cx.textAlign='right';
+        cx.fillText((typeof it[1]==='number'?Math.round(it[1]):it[1])+it[2], cx0+colW-2, y+2); cx.textAlign='left';
+      });
+    }
+    drawCol(left, 6);
+    drawCol(right, 12+colW);
   }
   function drawTape(now, col){
     // OP-1-style header: active track number + running timer
@@ -1437,7 +1767,8 @@ const Display = (() => {
       cx.strokeRect(x0, y+1, gw, th-2);
       cx.fillStyle = armed ? '#e5352b' : (active?col:'rgba(255,255,255,.5)');
       cx.font='700 8px monospace';
-      cx.fillText('T'+(i+1)+(tr.mute?'✕':'')+(armed?'●':''), x0+3, y+th*0.62);
+      const rl = (tr.rate===0.5?'½':tr.rate===2?'2×':'') + (tr.reverse?'◄':'');
+      cx.fillText('T'+(i+1)+(tr.mute?'✕':'')+(armed?'●':'')+(rl?' '+rl:''), x0+3, y+th*0.62);
       if(tr.buffer){
         const data = tr.buffer.getChannelData(0);
         const laneX = x0+26, laneW = gw-30, wy = y+th/2, wa = (th-6)/2;
@@ -1472,6 +1803,35 @@ const Display = (() => {
       }
     }
   }
+  function drawSmpl(now, col){
+    const sp = State.sampler;
+    if(Sampler.isRecording()){
+      cx.fillStyle='#e5352b'; cx.font='700 12px monospace'; cx.textAlign='center';
+      cx.fillText('● registrazione campione…', W/2, H/2); cx.textAlign='left';
+      return;
+    }
+    if(!sp.buffer){
+      cx.fillStyle='rgba(255,255,255,.4)'; cx.font='600 10px monospace'; cx.textAlign='center';
+      cx.fillText('Premi ● per registrare un campione', W/2, H/2-4);
+      cx.fillText('(mic o suono interno), poi suonalo sui tasti', W/2, H/2+10);
+      cx.textAlign='left'; return;
+    }
+    // waveform
+    const data = sp.buffer.getChannelData(0);
+    const x0=6, y0=20, gw=W-12, gh=H-30, wy=y0+gh/2, wa=gh/2-2;
+    cx.strokeStyle=col; cx.lineWidth=1; cx.beginPath();
+    const stepN=Math.max(1,Math.floor(data.length/gw));
+    for(let px=0;px<gw;px++){ let mn=1,mx=-1; for(let s=0;s<stepN;s++){ const v=data[px*stepN+s]||0; if(v<mn)mn=v; if(v>mx)mx=v; } cx.moveTo(x0+px,wy+mn*wa); cx.lineTo(x0+px,wy+mx*wa); }
+    cx.stroke();
+    // start/end markers
+    const sx=x0+sp.start*gw, ex=x0+sp.end*gw;
+    cx.fillStyle='rgba(199,125,255,.18)'; cx.fillRect(x0,y0,sx-x0,gh); cx.fillRect(ex,y0,x0+gw-ex,gh);
+    cx.strokeStyle='#c77dff'; cx.lineWidth=2;
+    cx.beginPath(); cx.moveTo(sx,y0); cx.lineTo(sx,y0+gh); cx.moveTo(ex,y0); cx.lineTo(ex,y0+gh); cx.stroke();
+    // base note label
+    cx.fillStyle='rgba(255,255,255,.7)'; cx.font='700 10px monospace'; cx.textAlign='right';
+    cx.fillText('base '+midiName(sp.baseNote)+' · '+sp.buffer.duration.toFixed(1)+'s', W-6, 12); cx.textAlign='left';
+  }
   function drawSynth(now, col){
     const s = State.synth;
     const active = Voices.active.size;
@@ -1486,6 +1846,9 @@ const Display = (() => {
       if(s.engine==='saw') y = ((x/W*4)%1)*2-1;
       else if(s.engine==='square') y = Math.sin(ph+t)>0?1:-1;
       else if(s.engine==='fm') y = Math.sin(ph + Math.sin(ph*s.fmRatio+t)*1.5);
+      else if(s.engine==='pulse'){ const duty=0.5+0.35*Math.sin(t); y = (((x/W*2)%1) < duty)?1:-1; }
+      else if(s.engine==='string') y = (Math.sin(ph+t)+Math.sin(ph*1.01+t)+Math.sin(ph*0.99+t))/3;
+      else if(s.engine==='cluster') y = (Math.sin(ph)+Math.sin(ph*1.19)+Math.sin(ph*1.5))/3;
       else y = Math.sin(ph+t);
       cx.lineTo(x, cxMid - y*amp);
     }
@@ -1505,7 +1868,7 @@ const Display = (() => {
     });
     // engine name
     cx.fillStyle='rgba(255,255,255,.85)'; cx.font='700 13px monospace'; cx.textAlign='center';
-    cx.fillText(({saw:'SAW',square:'SQUARE',sine:'SINE',fm:'FM'})[s.engine], W/2, H-4);
+    cx.fillText(ENGINE_LABELS[s.engine].toUpperCase(), W/2, H-4);
     cx.textAlign='left';
   }
   return { resize, flashNote, start(){ resize(); draw(); },
@@ -1540,16 +1903,25 @@ function attachScreenTouch(){
       const s=Math.floor((px-x0)/cw);
       if(s>=0&&s<16){ State.seq.editStep=s; } // tap a column to move the edit step
     } else if(sec==='tape'){
-      const x0=6,y0=18,gh=H-22,th=gh/4;
+      const x0=6,y0=18,gw=W-12,gh=H-22,th=gh/4;
       const i=Math.floor((py-y0)/th);
-      if(i>=0&&i<4){ State.tape.activeTrack=i; refreshEncoders();
-        // begin a drag on this lane (to move the track in time)
+      if(i>=0&&i<4){
+        State.tape.activeTrack=i; refreshEncoders();
+        if(typeof splitMode!=='undefined' && splitMode){
+          // split the tapped track at the tapped x (within the waveform area)
+          const laneX=x0+26, laneW=gw-30;
+          const frac=Math.max(0.02,Math.min(0.98,(px-laneX)/laneW));
+          Tape.splitLift(i, frac);
+          splitMode=false; document.getElementById('splitBtn').classList.remove('on');
+          refreshNumRow(); return;
+        }
+        // otherwise begin a drag on this lane (to move the track in time)
         drag = { track:i, startX:px, startOffset: State.tape.tracks[i].offset||0, moved:false };
       }
     } else if(sec==='synth'){
       // tap cycles engine
       const i=(ENGINES.indexOf(State.synth.engine)+1)%ENGINES.length;
-      State.synth.engine=ENGINES[i]; refreshEncoders(); toast('Engine: '+['Saw','Square','Sine','FM'][i]);
+      State.synth.engine=ENGINES[i]; refreshEncoders(); toast('Engine: '+ENGINE_LABELS[ENGINES[i]]);
     } else if(sec==='fx'){
       // tap a row and set value by x position
       const y0=26,rowH=(H-30)/4, bx=6+52, bw=(W-12)-80;
@@ -1599,6 +1971,7 @@ function attachScreenTouch(){
 /* ---------- Section tabs ---------- */
 function setSection(sec){
   State.section = sec;
+  document.body.setAttribute('data-section', sec);
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('active', b.dataset.sec===sec));
   refreshEncoders();
   refreshNumRow();
@@ -1618,13 +1991,20 @@ function numKeyAction(n){
   AudioEngine.ensure(); AudioEngine.resume();
   const sec = State.section;
   if(sec==='synth'){
-    if(n<4){ State.synth.engine = ENGINES[n]; toast('Engine: '+['Saw','Square','Sine','FM'][n]); }
+    if(n<ENGINES.length){ State.synth.engine = ENGINES[n]; toast('Engine: '+ENGINE_LABELS[ENGINES[n]]); }
   } else if(sec==='drum'){
     State.drum.selected = DRUMS[n]; toast('Drum: '+DRUM_LABELS[DRUMS[n]]);
     playDrum(DRUMS[n], AudioEngine.now()+0.001, false);
   } else if(sec==='tape'){
     if(n<4){ State.tape.activeTrack = n; toast('Traccia '+(n+1)); }
-    else { const ti=n-4; State.tape.tracks[ti].mute=!State.tape.tracks[ti].mute; toast('T'+(ti+1)+(State.tape.tracks[ti].mute?' mute':' on')); }
+    else {
+      const t = State.tape.tracks[State.tape.activeTrack];
+      if(n===4){ t.rate=0.5; toast('T'+(State.tape.activeTrack+1)+': velocità ½'); }
+      else if(n===5){ t.rate=1; toast('T'+(State.tape.activeTrack+1)+': velocità normale'); }
+      else if(n===6){ t.rate=2; toast('T'+(State.tape.activeTrack+1)+': velocità 2×'); }
+      else if(n===7){ t.reverse=!t.reverse; toast('T'+(State.tape.activeTrack+1)+': reverse '+(t.reverse?'on':'off')); }
+      if(Tape.playing) Tape.startPlay();
+    }
   } else if(sec==='seq'){
     if(n<SCALES.length){ State.seq.scaleIdx=n; toast('Scala: '+SCALES[n].name); }
     else { const modes=['endless','finger','tombola']; const mi=n-SCALES.length; if(modes[mi]){ State.seq.mode=modes[mi]; toast('Modo: '+modes[mi]); } }
@@ -1632,17 +2012,28 @@ function numKeyAction(n){
     const presets=[[0,0,0,0],[40,20,3,0],[30,60,4,0],[10,20,3,60]];
     const names=['Dry','Space','Dub','Crush'];
     if(n<4){ const p=presets[n]; State.fx.reverb=p[0];State.fx.delay=p[1];State.fx.delayTime=p[2];State.fx.drive=p[3];FX.update();toast('FX: '+names[n]); }
+    else {
+      // 5-8 cycle signature effects off->40->70->100->off
+      const keys=['punch','grid','spring','cwo']; const nm=['Punch','Grid','Spring','CWO'];
+      const k=keys[n-4]; const grades=[0,40,70,100];
+      let gi=grades.indexOf(State.fx[k]); if(gi<0)gi=0; gi=(gi+1)%grades.length;
+      State.fx[k]=grades[gi]; FX.update(); toast(nm[n-4]+' '+(gi>0?('grado '+gi):'off'));
+    }
+  } else if(sec==='smpl'){
+    if(n<5){ State.sampler.baseNote = 36 + n*12; toast('Base: '+midiName(State.sampler.baseNote)); }
+    else if(n===7){ Sampler.clear(); }
   }
   refreshEncoders(); refreshNumRow();
 }
 function refreshNumRow(){
   const sec = State.section;
   const labels = {
-    synth:['Saw','Squa','Sine','FM','','','',''],
+    synth:['Saw','Squa','Sine','FM','Puls','Strg','Clus',''],
+    smpl: ['C2','C3','C4','C5','C6','','','Clear'],
     drum: DRUMS.map(d=>DRUM_LABELS[d]),
-    tape: ['T1','T2','T3','T4','M1','M2','M3','M4'],
+    tape: ['T1','T2','T3','T4','½×','1×','2×','Rev'],
     seq:  ['Major','Minor','Dorian','Penta','Chrom','Endl','Fing','Tomb'],
-    fx:   ['Dry','Space','Dub','Crush','','','','']
+    fx:   ['Dry','Space','Dub','Crush','Punch','Grid','Sprg','CWO']
   }[sec] || ['','','','','','','',''];
   for(let i=0;i<8;i++){
     const btn = document.querySelector('.numk[data-num="'+i+'"]');
@@ -1652,9 +2043,18 @@ function refreshNumRow(){
     // active/on highlight
     let active=false, on=false;
     if(sec==='synth') active = ENGINES[i]===State.synth.engine;
+    else if(sec==='smpl') active = (i<5 && State.sampler.baseNote===36+i*12);
     else if(sec==='drum') active = DRUMS[i]===State.drum.selected;
-    else if(sec==='tape'){ if(i<4) active = i===State.tape.activeTrack; else on = State.tape.tracks[i-4] && State.tape.tracks[i-4].mute; }
+    else if(sec==='tape'){
+      const at = State.tape.activeTrack, t = State.tape.tracks[at];
+      if(i<4) active = i===at;
+      else if(i===4) active = t.rate===0.5;
+      else if(i===5) active = (t.rate===1 || !t.rate);
+      else if(i===6) active = t.rate===2;
+      else if(i===7) on = t.reverse;
+    }
     else if(sec==='seq'){ if(i<SCALES.length) active = i===State.seq.scaleIdx; else { const modes=['endless','finger','tombola']; active = modes[i-SCALES.length]===State.seq.mode; } }
+    else if(sec==='fx'){ const keys=['punch','grid','spring','cwo']; if(i>=4) on = State.fx[keys[i-4]]>0; }
     btn.classList.toggle('active', !!active);
     btn.classList.toggle('on', !!on);
   }
@@ -1686,7 +2086,15 @@ document.getElementById('playBtn').addEventListener('click', ()=>{
 });
 document.getElementById('recBtn').addEventListener('click', ()=>{
   AudioEngine.ensure(); AudioEngine.resume();
-  // REC always records a tape track, from ANY section, so you can capture
+  // In the SMPL section, REC records a short sample instead of a tape track.
+  if(State.section === 'smpl'){
+    Sampler.toggleRec();
+    const on = Sampler.isRecording();
+    State.recording = on;
+    document.getElementById('recBtn').classList.toggle('on', on);
+    return;
+  }
+  // Otherwise REC records a tape track, from ANY section, so you can capture
   // synth, drum machine, sequencer — whatever is playing.
   if(Tape.isRecording()){
     Tape.stopRec();
@@ -1697,17 +2105,30 @@ document.getElementById('recBtn').addEventListener('click', ()=>{
       const empty = State.tape.tracks.findIndex(t=>!t.buffer);
       if(empty >= 0){ tk = empty; State.tape.activeTrack = empty; }
     }
-    Tape.startRec(tk);
-    if(State.section !== 'tape') toast('REC su T'+(tk+1)+' — suona (● per fermare)');
+    if(State.countIn){
+      toast('Count-in… 1 · 2 · 3 · 4');
+      document.getElementById('recBtn').classList.add('on');
+      Metro.countIn(()=>{ Tape.startRec(tk); });
+    } else {
+      Tape.startRec(tk);
+      if(State.section !== 'tape') toast('REC su T'+(tk+1)+' — suona (● per fermare)');
+    }
   }
   const on = Tape.isRecording();
   State.recording = on;
   document.getElementById('recBtn').classList.toggle('on', on);
 });
 document.getElementById('metroBtn').addEventListener('click', ()=>{
+  AudioEngine.ensure(); AudioEngine.resume();
   State.metro = !State.metro;
   document.getElementById('metroBtn').classList.toggle('on', State.metro);
+  if(State.metro) Metro.start(); else Metro.stop();
   toast('Metronomo '+(State.metro?'on':'off'));
+});
+document.getElementById('countInBtn').addEventListener('click', ()=>{
+  State.countIn = !State.countIn;
+  document.getElementById('countInBtn').classList.toggle('on', State.countIn);
+  toast('Count-in '+(State.countIn?'on (1 battuta prima del REC)':'off'));
 });
 // MIC: toggle microphone as a recording source
 document.getElementById('micBtn').addEventListener('click', async ()=>{
@@ -1750,6 +2171,16 @@ document.getElementById('octUp').addEventListener('click', ()=>setOctave(State.o
 document.getElementById('octDown').addEventListener('click', ()=>setOctave(State.octave-1));
 document.getElementById('expWav').addEventListener('click', ()=>Export.exportAs('wav'));
 document.getElementById('expMp3').addEventListener('click', ()=>Export.exportAs('mp3'));
+document.getElementById('copyBtn').addEventListener('click', ()=>{ AudioEngine.ensure(); Tape.copyTrack(State.tape.activeTrack); });
+document.getElementById('pasteBtn').addEventListener('click', ()=>{ AudioEngine.ensure(); AudioEngine.resume(); if(State.section!=='tape') setSection('tape'); Tape.pasteTrack(State.tape.activeTrack); });
+let splitMode = false;
+document.getElementById('splitBtn').addEventListener('click', ()=>{
+  AudioEngine.ensure(); AudioEngine.resume();
+  if(State.section!=='tape') setSection('tape');
+  splitMode = !splitMode;
+  document.getElementById('splitBtn').classList.toggle('on', splitMode);
+  toast(splitMode ? 'Split ON — tocca una traccia dove tagliare' : 'Split off');
+});
 
 /* ---------- Save / Load dialog ---------- */
 const projDlg = document.getElementById('projDlg');
@@ -1781,6 +2212,30 @@ document.getElementById('projSaveGo').addEventListener('click', ()=>{
 });
 document.getElementById('projName').addEventListener('keydown', e=>{ e.stopPropagation(); if(e.key==='Enter'){ document.getElementById('projSaveGo').click(); } });
 
+/* ---------- Mixer dialog ---------- */
+const mixDlg = document.getElementById('mixDlg');
+function renderMixer(){
+  const wrap = document.getElementById('mixStrips');
+  wrap.innerHTML = '';
+  State.tape.tracks.forEach((t,i)=>{
+    const s = document.createElement('div'); s.className='mstrip';
+    s.innerHTML =
+      '<div class="mt">T'+(i+1)+'</div>'+
+      '<input class="vsl" type="range" min="0" max="120" value="'+t.vol+'">'+
+      '<div class="vval">'+t.vol+'%</div>'+
+      '<div class="prow"><input class="psl" type="range" min="-100" max="100" value="'+Math.round((t.pan||0)*100)+'"><span class="plbl">PAN</span></div>'+
+      '<button class="mbtn '+(t.mute?'on':'')+'">'+(t.mute?'MUTE':'ON')+'</button>';
+    const vsl=s.querySelector('.vsl'), vval=s.querySelector('.vval'), psl=s.querySelector('.psl'), mbtn=s.querySelector('.mbtn');
+    vsl.addEventListener('input', ()=>{ t.vol=+vsl.value; vval.textContent=t.vol+'%'; if(Tape.playing) Tape.startPlay(); });
+    psl.addEventListener('input', ()=>{ t.pan=(+psl.value)/100; if(Tape.playing) Tape.startPlay(); });
+    mbtn.addEventListener('click', ()=>{ t.mute=!t.mute; mbtn.classList.toggle('on',t.mute); mbtn.textContent=t.mute?'MUTE':'ON'; if(Tape.playing) Tape.startPlay(); });
+    wrap.appendChild(s);
+  });
+}
+document.getElementById('mixBtn').addEventListener('click', ()=>{ AudioEngine.ensure(); AudioEngine.resume(); renderMixer(); mixDlg.classList.add('show'); });
+document.getElementById('mixClose').addEventListener('click', ()=>mixDlg.classList.remove('show'));
+mixDlg.addEventListener('click', e=>{ if(e.target===mixDlg) mixDlg.classList.remove('show'); });
+
 /* ---------- Orientation ---------- */
 function checkOrientation(){
   const portrait = window.innerHeight > window.innerWidth;
@@ -1793,6 +2248,7 @@ window.addEventListener('orientationchange', ()=>setTimeout(checkOrientation,200
 /* ---------- Init ---------- */
 function init(){
   initPatterns();
+  document.body.setAttribute('data-section', State.section);
   buildKeyboard();
   attachEncoders();
   attachScreenTouch();
