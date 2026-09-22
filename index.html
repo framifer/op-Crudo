@@ -107,9 +107,29 @@
   #transport button.rec.on{background:#e5352b;color:#fff;animation:pulse 1.1s infinite;}
   @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(229,53,43,.6)}50%{box-shadow:0 0 0 8px rgba(229,53,43,0)}}
   #transport .sp{margin-left:auto;}
-  #transport .bpmbox{display:flex;align-items:center;gap:4px;background:#efece5;border:2px solid #0003;border-radius:8px;padding:0 4px;height:100%;flex:0 0 auto;}
-  #transport .bpmbox b{font-size:12px;min-width:50px;text-align:center;}
-  #transport .bpmbox button{border:none;background:transparent;min-width:24px;height:24px;padding:0;font-size:16px;}
+  #transport .bpmbox{display:flex;align-items:center;gap:2px;background:#efece5;border:2px solid #0003;border-radius:8px;padding:0 4px;height:100%;flex:0 0 auto;}
+  #transport .bpmbox input#bpmInput{width:42px;border:none;background:transparent;font-size:13px;font-weight:900;color:var(--ink);text-align:center;-moz-appearance:textfield;padding:0;}
+  #transport .bpmbox input#bpmInput::-webkit-outer-spin-button,#transport .bpmbox input#bpmInput::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+  #transport .bpmbox .bpmunit{font-size:9px;font-weight:800;opacity:.6;}
+  #transport .bpmbox button{border:none;background:transparent;min-width:22px;height:24px;padding:0;font-size:16px;}
+
+  /* Save / Load dialog */
+  #projDlg{position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;background:rgba(10,10,14,.55);}
+  #projDlg.show{display:flex;}
+  #projBox{background:linear-gradient(180deg,#efeae2,#ded8cd);border:2px solid #0003;border-radius:14px;padding:12px;width:min(92vw,420px);max-height:82dvh;overflow:auto;box-shadow:0 8px 28px rgba(0,0,0,.45);}
+  #projBox .projhead{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  #projBox #projTitle{font-weight:900;font-size:15px;color:var(--ink);margin-right:auto;}
+  #projBox #projClose{border:2px solid #0003;background:#efece5;border-radius:7px;width:28px;height:28px;font-weight:800;cursor:pointer;}
+  #projBox .projsaverow{display:flex;gap:6px;margin-bottom:10px;}
+  #projBox .projsaverow input{flex:1;min-width:0;border:2px solid #0003;border-radius:8px;padding:6px 8px;font-size:13px;font-weight:700;}
+  #projBox .projsaverow button{border:2px solid #0003;background:var(--orange);color:#fff;border-radius:8px;padding:0 12px;font-weight:800;cursor:pointer;white-space:nowrap;}
+  #projBox #projList{display:flex;flex-direction:column;gap:6px;}
+  #projBox .prj{display:flex;align-items:center;gap:6px;border:2px solid #0003;border-radius:9px;padding:7px;background:#fff8ea;}
+  #projBox .prj .pn{flex:1;min-width:0;font-weight:800;font-size:13px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+  #projBox .prj .pd{font-size:9px;opacity:.55;font-weight:700;margin-right:4px;white-space:nowrap;}
+  #projBox .prj button{border:2px solid #0003;background:#efece5;border-radius:7px;height:30px;padding:0 9px;cursor:pointer;font-weight:800;font-size:12px;}
+  #projBox .prj button.del{color:#e5352b;}
+  #projBox .empty{font-size:12px;opacity:.6;font-weight:700;text-align:center;padding:10px;}
 
   #toast{position:fixed;left:50%;bottom:6px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#f4f1ea;
     padding:6px 12px;border-radius:10px;font-size:11px;font-weight:700;z-index:60;opacity:0;transition:all .3s;pointer-events:none;max-width:90vw;text-align:center;}
@@ -187,14 +207,23 @@
       <button id="micBtn" title="Microfono: registra voce/suoni dal vivo">🎤</button>
       <button id="metroBtn" title="Metronomo">🔔</button>
       <button id="arpBtn" title="Arpeggiatore delle note suonate">ARP</button>
-      <div class="bpmbox"><button id="bpmDown">−</button><b id="bpmVal">120 BPM</b><button id="bpmUp">+</button></div>
+      <div class="bpmbox"><button id="bpmDown">−</button><input id="bpmInput" type="number" min="40" max="240" step="1" value="120" title="Digita i BPM" /><span class="bpmunit">BPM</span><button id="bpmUp">+</button></div>
       <button id="octDown" class="sp">8va −</button>
       <button id="octUp">8va +</button>
+      <button id="saveBtn" title="Salva progetto (strumento, BPM, tracce, drum, seq, fx)">💾</button>
+      <button id="loadBtn" title="Progetti salvati">📂</button>
       <button id="expWav" title="Esporta mix in WAV">⤓WAV</button>
       <button id="expMp3" title="Esporta mix in MP3">⤓MP3</button>
     </div>
   </div>
 </div>
+
+<!-- Save / Load dialog -->
+<div id="projDlg"><div id="projBox">
+  <div class="projhead"><span id="projTitle">Progetti salvati</span><button id="projClose">✕</button></div>
+  <div class="projsaverow"><input id="projName" type="text" placeholder="Nome progetto" maxlength="40" /><button id="projSaveGo">💾 Salva</button></div>
+  <div id="projList"></div>
+</div></div>
 
 <div id="toast"></div>
 
@@ -824,6 +853,29 @@ const Export = (() => {
     });
     return await off.startRendering();
   }
+  // Anti-clipping: normalize the mix so its peak sits at a safe ceiling, then apply
+  // a gentle soft-clip as a safety net. Result never exceeds +/-1.0 -> no distortion.
+  function preventClipping(buf){
+    const ch = buf.numberOfChannels, len = buf.length;
+    const CEIL = 0.95;             // target peak headroom
+    // 1) find true peak across all channels
+    let peak = 0;
+    for(let c=0;c<ch;c++){ const d=buf.getChannelData(c); for(let i=0;i<len;i++){ const a=Math.abs(d[i]); if(a>peak) peak=a; } }
+    if(peak === 0) return buf;      // silence
+    // 2) linear gain so the loudest sample reaches CEIL (only reduce, never boost above)
+    const gain = peak > CEIL ? CEIL/peak : 1;
+    // 3) apply gain + soft-clip (tanh) as a final safety net for any residual overshoot
+    for(let c=0;c<ch;c++){
+      const d = buf.getChannelData(c);
+      for(let i=0;i<len;i++){
+        let s = d[i]*gain;
+        // soft knee only kicks in near the ceiling; below it, audio is untouched
+        if(s > CEIL || s < -CEIL){ s = Math.tanh(s); }
+        d[i] = Math.max(-0.999, Math.min(0.999, s));
+      }
+    }
+    return buf;
+  }
   // 16-bit PCM WAV
   function encodeWAV(buf){
     const numCh = buf.numberOfChannels, sr = buf.sampleRate;
@@ -872,12 +924,108 @@ const Export = (() => {
     try {
       const mix = await mixdown();
       if(!mix){ toast('Nessun audio (tutte mute?)'); return; }
+      preventClipping(mix);   // anti-distortion: normalize + soft-limit
       const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
       if(fmt==='wav'){ download(encodeWAV(mix), 'op-Crudo-'+stamp+'.wav'); toast('WAV esportato'); }
       else { const b = encodeMP3(mix); if(b){ download(b,'op-Crudo-'+stamp+'.mp3'); toast('MP3 esportato'); } }
     } catch(e){ toast('Errore export: '+e.message); }
   }
   return { exportAs };
+})();
+
+/* ---------- Project: save/load the full op-Crudo state to localStorage ---------- */
+const Project = (() => {
+  const KEY = 'opcrudo.projects.v1';
+  // ---- base64 <-> ArrayBuffer helpers ----
+  function abToB64(ab){
+    const bytes = new Uint8Array(ab); let bin='';
+    const chunk=0x8000;
+    for(let i=0;i<bytes.length;i+=chunk){ bin += String.fromCharCode.apply(null, bytes.subarray(i,i+chunk)); }
+    return btoa(bin);
+  }
+  function b64ToAb(b64){
+    const bin = atob(b64); const len=bin.length; const bytes=new Uint8Array(len);
+    for(let i=0;i<len;i++) bytes[i]=bin.charCodeAt(i);
+    return bytes.buffer;
+  }
+  // encode an AudioBuffer to compact 16-bit PCM (mono if channels identical, else stereo)
+  function bufToData(buf){
+    const ch = buf.numberOfChannels, len = buf.length;
+    const pcm = new Int16Array(len*ch);
+    for(let c=0;c<ch;c++){ const d=buf.getChannelData(c); for(let i=0;i<len;i++){ const s=Math.max(-1,Math.min(1,d[i])); pcm[i*ch+c]=s<0?s*0x8000:s*0x7FFF; } }
+    return { sr:buf.sampleRate, ch, len, pcm: abToB64(pcm.buffer) };
+  }
+  function dataToBuf(d){
+    const ctx = AudioEngine.ensure();
+    const pcm = new Int16Array(b64ToAb(d.pcm));
+    const buf = ctx.createBuffer(d.ch, d.len, d.sr);
+    for(let c=0;c<d.ch;c++){ const out=buf.getChannelData(c); for(let i=0;i<d.len;i++){ out[i]=pcm[i*d.ch+c]/0x8000; } }
+    return buf;
+  }
+  function serialize(){
+    return {
+      version: 1,
+      savedAt: Date.now(),
+      section: State.section,
+      octave: State.octave,
+      bpm: State.bpm,
+      synth: JSON.parse(JSON.stringify(State.synth)),
+      drum: { selected:State.drum.selected, vol:State.drum.vol, tune:State.drum.tune, decay:State.drum.decay, swing:State.drum.swing,
+              pattern: JSON.parse(JSON.stringify(State.drum.pattern)) },
+      seq: { mode:State.seq.mode, root:State.seq.root, scaleIdx:State.seq.scaleIdx, gate:State.seq.gate, density:State.seq.density,
+             pattern: JSON.parse(JSON.stringify(State.seq.pattern)) },
+      fx: JSON.parse(JSON.stringify(State.fx)),
+      arp: JSON.parse(JSON.stringify(State.arp)),
+      tape: State.tape.tracks.map(t=>({ mute:t.mute, vol:t.vol, offset:t.offset, audio: t.buffer? bufToData(t.buffer):null }))
+    };
+  }
+  function apply(p){
+    if(!p) return;
+    State.octave = p.octave ?? 0;
+    setBpm(p.bpm || 120);
+    Object.assign(State.synth, p.synth||{});
+    Object.assign(State.drum, { selected:p.drum.selected, vol:p.drum.vol, tune:p.drum.tune, decay:p.drum.decay, swing:p.drum.swing });
+    State.drum.pattern = p.drum.pattern;
+    Object.assign(State.seq, { mode:p.seq.mode, root:p.seq.root, scaleIdx:p.seq.scaleIdx, gate:p.seq.gate, density:p.seq.density });
+    State.seq.pattern = p.seq.pattern;
+    Object.assign(State.fx, p.fx||{});
+    Object.assign(State.arp, p.arp||{});
+    // tape
+    Tape.stopPlay();
+    (p.tape||[]).forEach((t,i)=>{
+      if(i>3) return;
+      State.tape.tracks[i].mute = t.mute; State.tape.tracks[i].vol = t.vol; State.tape.tracks[i].offset = t.offset||0;
+      State.tape.tracks[i].buffer = t.audio ? dataToBuf(t.audio) : null;
+    });
+    if(typeof FX!=='undefined') FX.update();
+    setSection(p.section || 'synth');
+    // reflect arp button
+    const arpBtn=document.getElementById('arpBtn');
+    if(State.arp.on){ arpBtn.classList.add('on'); arpBtn.textContent='ARP '+({up:'↑Up',down:'↓Dn',updown:'↕UpDn',random:'🔀Rnd'}[State.arp.dir]||''); Arp.setEnabled(true); }
+    else { arpBtn.classList.remove('on'); arpBtn.textContent='ARP'; Arp.setEnabled(false); }
+  }
+  // ---- storage list ----
+  function list(){ try{ return JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){ return []; } }
+  function writeList(arr){ localStorage.setItem(KEY, JSON.stringify(arr)); }
+  function save(name){
+    name = (name||'').trim() || ('Progetto '+new Date().toLocaleString('it-IT'));
+    const data = serialize();
+    const entry = { id:'p'+Date.now(), name, savedAt:data.savedAt, data };
+    const arr = list();
+    // replace if same name
+    const ex = arr.findIndex(e=>e.name===name);
+    if(ex>=0) arr[ex]=entry; else arr.push(entry);
+    try { writeList(arr); toast('Salvato: '+name); return true; }
+    catch(e){ toast('Spazio insufficiente — tracce tape troppo lunghe'); return false; }
+  }
+  function load(id){
+    const e = list().find(x=>x.id===id);
+    if(!e){ toast('Progetto non trovato'); return; }
+    try { apply(e.data); toast('Caricato: '+e.name); }
+    catch(err){ toast('Errore caricamento: '+err.message); }
+  }
+  function remove(id){ writeList(list().filter(x=>x.id!==id)); }
+  return { list, save, load, remove };
 })();
 
 /* ---------- Pattern init & step editing ---------- */
@@ -1585,14 +1733,53 @@ document.getElementById('arpBtn').addEventListener('click', ()=>{
   if(next===null){ Arp.setEnabled(false); btn.classList.remove('on'); btn.textContent='ARP'; toast('Arp off'); }
   else { State.arp.dir=next; Arp.setEnabled(true); btn.classList.add('on'); btn.textContent='ARP '+ARP_LABEL[next]; toast('Arp '+ARP_LABEL[next]); }
 });
-function setBpm(v){ State.bpm = Math.max(40, Math.min(240, v)); document.getElementById('bpmVal').textContent = State.bpm+' BPM'; if(typeof FX!=='undefined') FX.update(); }
+function setBpm(v){ State.bpm = Math.max(40, Math.min(240, Math.round(v)||120));
+  const inp=document.getElementById('bpmInput'); if(inp && document.activeElement!==inp) inp.value = State.bpm;
+  if(typeof FX!=='undefined') FX.update(); }
 document.getElementById('bpmUp').addEventListener('click', ()=>setBpm(State.bpm+1));
 document.getElementById('bpmDown').addEventListener('click', ()=>setBpm(State.bpm-1));
+(function(){
+  const inp=document.getElementById('bpmInput');
+  // live update as you type; clamp on blur/enter
+  inp.addEventListener('input', ()=>{ const v=parseInt(inp.value,10); if(!isNaN(v)) setBpm(v); });
+  inp.addEventListener('blur', ()=>{ inp.value=State.bpm; });
+  inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ inp.blur(); } e.stopPropagation(); });
+})();
 function setOctave(v){ State.octave = Math.max(-2, Math.min(2, v)); toast('Ottava '+(State.octave>=0?'+':'')+State.octave); }
 document.getElementById('octUp').addEventListener('click', ()=>setOctave(State.octave+1));
 document.getElementById('octDown').addEventListener('click', ()=>setOctave(State.octave-1));
 document.getElementById('expWav').addEventListener('click', ()=>Export.exportAs('wav'));
 document.getElementById('expMp3').addEventListener('click', ()=>Export.exportAs('mp3'));
+
+/* ---------- Save / Load dialog ---------- */
+const projDlg = document.getElementById('projDlg');
+function renderProjList(){
+  const wrap = document.getElementById('projList');
+  const items = Project.list().sort((a,b)=>b.savedAt-a.savedAt);
+  if(!items.length){ wrap.innerHTML = '<div class="empty">Nessun progetto salvato.<br>Scrivi un nome e premi Salva.</div>'; return; }
+  wrap.innerHTML = '';
+  items.forEach(e=>{
+    const row = document.createElement('div'); row.className='prj';
+    const d = new Date(e.savedAt);
+    row.innerHTML = '<span class="pn"></span><span class="pd"></span><button class="load">📂 Apri</button><button class="del">🗑</button>';
+    row.querySelector('.pn').textContent = e.name;
+    row.querySelector('.pd').textContent = d.toLocaleDateString('it-IT')+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});
+    row.querySelector('.load').addEventListener('click', ()=>{ Project.load(e.id); closeProj(); });
+    row.querySelector('.del').addEventListener('click', ()=>{ if(confirm('Eliminare "'+e.name+'"?')){ Project.remove(e.id); renderProjList(); } });
+    wrap.appendChild(row);
+  });
+}
+function openProj(){ AudioEngine.ensure(); AudioEngine.resume(); renderProjList(); projDlg.classList.add('show'); }
+function closeProj(){ projDlg.classList.remove('show'); }
+document.getElementById('saveBtn').addEventListener('click', ()=>{ openProj(); const n=document.getElementById('projName'); n.focus(); });
+document.getElementById('loadBtn').addEventListener('click', openProj);
+document.getElementById('projClose').addEventListener('click', closeProj);
+projDlg.addEventListener('click', e=>{ if(e.target===projDlg) closeProj(); });
+document.getElementById('projSaveGo').addEventListener('click', ()=>{
+  const inp=document.getElementById('projName');
+  if(Project.save(inp.value)){ inp.value=''; renderProjList(); }
+});
+document.getElementById('projName').addEventListener('keydown', e=>{ e.stopPropagation(); if(e.key==='Enter'){ document.getElementById('projSaveGo').click(); } });
 
 /* ---------- Orientation ---------- */
 function checkOrientation(){
