@@ -78,13 +78,13 @@
   .enc .lbl{font-size:9px;font-weight:800;text-align:center;color:var(--ink);opacity:.85;line-height:1.1;white-space:pre;}
 
   /* functional 1-8 keys row */
-  #numrow{flex:0 0 auto;display:flex;gap:5px;margin-top:6px;height:clamp(28px, 8dvh, 42px);}
-  .numk{flex:1 1 0;min-width:0;height:100%;border:2px solid #0002;background:#efece5;border-radius:9px;cursor:pointer;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:2px;color:var(--ink);}
-  .numk b{font-size:14px;font-weight:900;line-height:1;}
-  .numk span{font-size:8px;font-weight:800;opacity:.6;line-height:1.1;max-width:100%;overflow:hidden;white-space:nowrap;}
+  #numrow{flex:0 0 auto;display:flex;gap:4px;margin-top:4px;height:clamp(18px, 4.5dvh, 26px);}
+  .numk{flex:1 1 0;min-width:0;height:100%;border:1.5px solid #0002;background:#efece5;border-radius:6px;cursor:pointer;
+    display:flex;flex-direction:row;align-items:center;justify-content:center;gap:3px;padding:0 3px;color:var(--ink);overflow:hidden;}
+  .numk b{font-size:11px;font-weight:900;line-height:1;flex:0 0 auto;}
+  .numk span{font-size:8px;font-weight:800;opacity:.55;line-height:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
   .numk.active{background:var(--ink);color:#f4f1ea;border-color:#000;}
-  .numk.active span{opacity:.8;}
+  .numk.active span{opacity:.85;}
   .numk.on{background:var(--orange);color:#fff;border-color:#0003;}
 
   /* bottom: keyboard */
@@ -120,8 +120,8 @@
     #main{height:clamp(74px, 26dvh, 110px);}
     .enc .knob{width:clamp(30px,8.5dvh,42px);height:clamp(30px,8.5dvh,42px);}
     .enc .lbl{font-size:8px;}
-    #numrow{height:clamp(24px,7dvh,34px);}
-    .numk b{font-size:12px;} .numk span{font-size:7px;}
+    #numrow{height:clamp(16px,4dvh,22px);}
+    .numk b{font-size:10px;} .numk span{font-size:7px;}
     #kb{min-height:40px;}
     #transport{height:clamp(28px,7dvh,34px);}
     #topbar{padding:0 2px 2px;}
@@ -130,7 +130,8 @@
   @media (max-height:340px){
     #main{height:clamp(64px,24dvh,92px);}
     .enc .lbl{display:none;}   /* hide labels, keep knobs usable */
-    #numrow{height:22px;}
+    #numrow{height:16px;}
+    .numk span{display:none;}  /* only numbers when very short */
     #transport button{font-size:11px;min-width:34px;padding:0 6px;}
   }
 </style>
@@ -183,10 +184,9 @@
     <div id="transport">
       <button id="playBtn" title="Play/Stop">▶</button>
       <button id="recBtn" class="rec" title="Rec">●</button>
+      <button id="micBtn" title="Microfono: registra voce/suoni dal vivo">🎤</button>
       <button id="metroBtn" title="Metronomo">🔔</button>
       <button id="arpBtn" title="Arpeggiatore delle note suonate">ARP</button>
-      <button id="dlyBtn" title="Delay: tocca per ciclare off/1/2/3">DLY</button>
-      <button id="revBtn" title="Riverbero: tocca per ciclare off/1/2/3">REV</button>
       <div class="bpmbox"><button id="bpmDown">−</button><b id="bpmVal">120 BPM</b><button id="bpmUp">+</button></div>
       <button id="octDown" class="sp">8va −</button>
       <button id="octUp">8va +</button>
@@ -208,7 +208,7 @@
 
 /* ---------- Audio engine (single shared context) ---------- */
 const AudioEngine = (() => {
-  let ctx = null, master = null, comp = null, fxIn = null, tap = null;
+  let ctx = null, master = null, comp = null, fxIn = null, tap = null, recMix = null, micStream = null, micNode = null, micGain = null, monitorBus = null;
   function ensure(){
     if(ctx) return ctx;
     ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -218,30 +218,60 @@ const AudioEngine = (() => {
     comp.attack.value = 0.003; comp.release.value = 0.25;
     master.connect(comp); comp.connect(ctx.destination);
     FX.build(ctx, master);   // set up fx sends feeding master
-    // Recording tap: a ScriptProcessor that always listens to the post-comp mix.
-    // It reads L/R samples and forwards them to Tape.captureFrame() when armed.
+    // recMix = what the recorder captures. Internal LIVE audio (comp) feeds it;
+    // the mic (when enabled) also feeds it — but the mic is NOT routed to speakers.
+    recMix = ctx.createGain(); recMix.gain.value = 1;
+    comp.connect(recMix);
+    micGain = ctx.createGain(); micGain.gain.value = 0; // 0 until mic enabled
+    micGain.connect(recMix);
+    // monitorBus = heard through the SPEAKERS ONLY, never recorded. Tape playback
+    // (already-recorded tracks) goes here so you can play along during overdub
+    // without the existing tracks bleeding into the new recording.
+    monitorBus = ctx.createGain(); monitorBus.gain.value = 1;
+    monitorBus.connect(ctx.destination);
+    // Recording tap: a ScriptProcessor that listens to recMix and forwards
+    // samples to Tape.captureFrame() when armed.
     try {
       const bufSize = 4096;
       tap = ctx.createScriptProcessor(bufSize, 2, 2);
       tap.onaudioprocess = (e)=>{
         const inL = e.inputBuffer.getChannelData(0);
         const inR = e.inputBuffer.numberOfChannels>1 ? e.inputBuffer.getChannelData(1) : inL;
-        // pass-through (silent) to keep the node alive
         const outL = e.outputBuffer.getChannelData(0);
         const outR = e.outputBuffer.getChannelData(1);
         outL.fill(0); outR.fill(0);
         if(typeof Tape!=='undefined' && Tape.capturing()) Tape.captureFrame(inL, inR);
       };
-      comp.connect(tap);
-      tap.connect(ctx.destination); // required for ScriptProcessor to fire; output is silent
+      recMix.connect(tap);
+      tap.connect(ctx.destination); // silent output; required to keep the node running
     } catch(e){ tap = null; }
     return ctx;
   }
   function resume(){ if(ctx && ctx.state === 'suspended') ctx.resume(); }
+  async function enableMic(){
+    ensure(); resume();
+    if(micNode) return true;
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true } });
+      micNode = ctx.createMediaStreamSource(micStream);
+      micNode.connect(micGain);
+      micGain.gain.value = 1;
+      return true;
+    } catch(e){ return false; }
+  }
+  function disableMic(){
+    if(micGain) micGain.gain.value = 0;
+    if(micNode){ try{ micNode.disconnect(); }catch(e){} micNode = null; }
+    if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream = null; }
+  }
+  function micActive(){ return !!micNode; }
+  // let the user monitor (hear) the mic through the speakers — off by default to avoid feedback
+  function setMicMonitor(on){ if(micGain && micNode){ /* monitor via master */ } }
   return {
-    ensure, resume,
+    ensure, resume, enableMic, disableMic, micActive,
     get ctx(){ return ctx; },
     get master(){ return master; },
+    get monitorBus(){ return monitorBus; },
     now(){ return ctx ? ctx.currentTime : 0; }
   };
 })();
@@ -703,7 +733,9 @@ const Tape = (() => {
     if(capturingFlag||armed) stopRec();
     recTrack = track; capL = []; capR = []; capLen = 0; peak = 0; framesSeen = 0;
     armed = true; capturingFlag = false;   // wait for first sound
-    toast('REC T'+(track+1)+' armato — parte al primo suono');
+    // play-along guide: monitor the OTHER recorded tracks (speakers only, not recorded)
+    if(hasAudio()){ startPlay(track); toast('REC T'+(track+1)+' — le altre tracce fanno da guida'); }
+    else { toast('REC T'+(track+1)+' armato — parte al primo suono'); }
   }
   function stopRec(){
     if(!capturingFlag && !armed) return;
@@ -711,17 +743,29 @@ const Tape = (() => {
     capturingFlag = false; armed = false;
     const ctx = AudioEngine.ctx;
     if(!wasCapturing || capLen === 0){ toast('Registrazione annullata (nessun suono)'); recTrack=-1; return; }
-    const buf = ctx.createBuffer(2, capLen, ctx.sampleRate);
+    const sr = ctx.sampleRate;
+    // --- bar quantization ---
+    // A bar = 4 beats. Round the recording length UP to the next whole bar so the
+    // remainder of the current bar is completed (with silence) and loops stay in time.
+    const barSec = (60 / State.bpm) * 4;
+    const barSamples = Math.round(barSec * sr);
+    const bars = Math.max(1, Math.ceil(capLen / barSamples - 0.02)); // round up, tiny tolerance for near-exact takes
+    const quantLen = bars * barSamples;
+    const buf = ctx.createBuffer(2, quantLen, sr);
     const dL = buf.getChannelData(0), dR = buf.getChannelData(1);
     let off = 0;
-    for(let i=0;i<capL.length;i++){ dL.set(capL[i], off); dR.set(capR[i], off); off += capL[i].length; }
+    for(let i=0;i<capL.length && off<quantLen;i++){
+      const n = Math.min(capL[i].length, quantLen-off);
+      dL.set(capL[i].subarray(0,n), off); dR.set(capR[i].subarray(0,n), off); off += n;
+    }
+    // (samples beyond capLen remain 0 = silence, completing the bar)
     State.tape.tracks[recTrack].buffer = buf;
     State.tape.tracks[recTrack].offset = 0;
-    toast('T'+(recTrack+1)+' reg: '+buf.duration.toFixed(1)+'s · peak '+peak.toFixed(2));
+    toast('T'+(recTrack+1)+': '+bars+' battut'+(bars>1?'e':'a')+' · '+buf.duration.toFixed(1)+'s · peak '+peak.toFixed(2));
     capL = []; capR = []; capLen = 0;
     recTrack = -1;
   }
-  function startPlay(){
+  function startPlay(excludeTrack){
     const ctx = AudioEngine.ensure(); AudioEngine.resume();
     stopPlay();
     playing = true;
@@ -729,13 +773,16 @@ const Tape = (() => {
     State.tape.tracks.forEach(t=>{ if(t.buffer) maxDur = Math.max(maxDur, t.buffer.duration + Math.max(0,t.offset)); });
     if(maxDur === 0){ return; }
     const startAt = ctx.currentTime + 0.06;
+    // tape playback goes to the MONITOR bus: heard through speakers but NOT captured
+    // by the recorder, so existing tracks never bleed into a new overdub.
+    const dest = AudioEngine.monitorBus || AudioEngine.master;
     State.tape.tracks.forEach((t,i)=>{
       if(!t.buffer || t.mute) return;
+      if(excludeTrack!==undefined && i===excludeTrack) return; // don't monitor the track being recorded
       const src = ctx.createBufferSource();
       src.buffer = t.buffer; src.loop = true;
-      // loop over the whole timeline length so offset tracks stay aligned
       const g = ctx.createGain(); g.gain.value = t.vol/100;
-      src.connect(g); g.connect(AudioEngine.master);
+      src.connect(g); g.connect(dest);
       const off = t.offset||0;
       if(off >= 0){ src.start(startAt + off); }
       else { src.start(startAt, Math.min(-off, t.buffer.duration-0.01)); }
@@ -1055,7 +1102,6 @@ function refreshEncoders(){
     lbl.style.whiteSpace = 'pre';
   }
   if(typeof refreshNumRow==='function') refreshNumRow();
-  if(typeof refreshFxButtons==='function') refreshFxButtons();
 }
 function attachEncoders(){
   document.querySelectorAll('.knob').forEach(knob=>{
@@ -1515,6 +1561,18 @@ document.getElementById('metroBtn').addEventListener('click', ()=>{
   document.getElementById('metroBtn').classList.toggle('on', State.metro);
   toast('Metronomo '+(State.metro?'on':'off'));
 });
+// MIC: toggle microphone as a recording source
+document.getElementById('micBtn').addEventListener('click', async ()=>{
+  const btn = document.getElementById('micBtn');
+  if(AudioEngine.micActive()){
+    AudioEngine.disableMic(); btn.classList.remove('on'); toast('Microfono off');
+  } else {
+    toast('Richiesta accesso microfono…');
+    const ok = await AudioEngine.enableMic();
+    if(ok){ btn.classList.add('on'); toast('Microfono ON — premi ● per registrare'); }
+    else { toast('Microfono negato o non disponibile'); }
+  }
+});
 // ARP: cycle off -> up -> down -> updown -> random -> off
 const ARP_CYCLE = [null,'up','down','updown','random'];
 const ARP_LABEL = {up:'↑Up',down:'↓Dn',updown:'↕UpDn',random:'🔀Rnd'};
@@ -1527,37 +1585,6 @@ document.getElementById('arpBtn').addEventListener('click', ()=>{
   if(next===null){ Arp.setEnabled(false); btn.classList.remove('on'); btn.textContent='ARP'; toast('Arp off'); }
   else { State.arp.dir=next; Arp.setEnabled(true); btn.classList.add('on'); btn.textContent='ARP '+ARP_LABEL[next]; toast('Arp '+ARP_LABEL[next]); }
 });
-// DLY / REV quick buttons: cycle off -> 1 -> 2 -> 3 -> off (3 grades)
-const DELAY_GRADES = [0, 30, 55, 80];   // % per grade
-const REVERB_GRADES = [0, 35, 65, 95];
-function cycleFx(which){
-  AudioEngine.ensure(); AudioEngine.resume();
-  const grades = which==='delay' ? DELAY_GRADES : REVERB_GRADES;
-  const cur = which==='delay' ? State.fx.delay : State.fx.reverb;
-  // find nearest current grade, advance to next
-  let idx = grades.indexOf(cur);
-  if(idx < 0){ idx = 0; }               // if a custom value was set, restart cycle
-  const nidx = (idx+1) % grades.length;
-  const val = grades[nidx];
-  if(which==='delay') State.fx.delay = val; else State.fx.reverb = val;
-  FX.update();
-  const btn = document.getElementById(which==='delay'?'dlyBtn':'revBtn');
-  const label = which==='delay' ? 'DLY' : 'REV';
-  btn.classList.toggle('on', nidx>0);
-  btn.textContent = nidx>0 ? label+' '+nidx : label;
-  toast((which==='delay'?'Delay':'Riverbero')+' '+(nidx>0?('grado '+nidx):'off'));
-  refreshEncoders();
-}
-document.getElementById('dlyBtn').addEventListener('click', ()=>cycleFx('delay'));
-document.getElementById('revBtn').addEventListener('click', ()=>cycleFx('reverb'));
-function gradeOf(val, grades){ let g=0; for(let i=1;i<grades.length;i++){ if(val>=grades[i]-1) g=i; } return g; }
-function refreshFxButtons(){
-  const d = gradeOf(State.fx.delay, DELAY_GRADES);
-  const r = gradeOf(State.fx.reverb, REVERB_GRADES);
-  const db = document.getElementById('dlyBtn'), rb = document.getElementById('revBtn');
-  if(db){ db.classList.toggle('on', d>0); db.textContent = d>0?('DLY '+d):'DLY'; }
-  if(rb){ rb.classList.toggle('on', r>0); rb.textContent = r>0?('REV '+r):'REV'; }
-}
 function setBpm(v){ State.bpm = Math.max(40, Math.min(240, v)); document.getElementById('bpmVal').textContent = State.bpm+' BPM'; if(typeof FX!=='undefined') FX.update(); }
 document.getElementById('bpmUp').addEventListener('click', ()=>setBpm(State.bpm+1));
 document.getElementById('bpmDown').addEventListener('click', ()=>setBpm(State.bpm-1));
