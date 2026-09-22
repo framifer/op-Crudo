@@ -1,0 +1,42 @@
+{
+  "name": "op-Crudo",
+  "short_name": "op-Crudo",
+  "description": "Sintetizzatore/workstation portatile ispirato all'OP-1: synth, drum machine, tape 4 tracce, sequencer ed effetti.",
+  "id": "/",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone", "minimal-ui"],
+  "orientation": "landscape",
+  "background_color": "#26262a",
+  "theme_color": "#111114",
+  "categories": ["music", "entertainment", "utilities"],
+  "lang": "it",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
