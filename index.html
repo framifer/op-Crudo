@@ -156,6 +156,8 @@
   .mstrip .plbl{font-size:9px;font-weight:800;opacity:.6;}
   .mstrip .mbtn{border:2px solid #0003;background:#efece5;border-radius:6px;width:100%;height:26px;font-size:11px;font-weight:900;cursor:pointer;}
   .mstrip .mbtn.on{background:var(--ink);color:#f4f1ea;border-color:#000;}
+  .mstrip .delbtn{border:2px solid #e5352b;background:#fff;color:#e5352b;border-radius:6px;width:100%;height:24px;font-size:12px;cursor:pointer;}
+  .mstrip .delbtn:disabled{opacity:.35;cursor:default;border-color:#0003;color:#0006;}
   @media (max-height:520px){ .mstrip .vsl{height:90px;} }
 
   /* ---- HiCrudo panel ---- */
@@ -260,11 +262,11 @@
     <div id="transport">
       <button id="playBtn" title="Play/Stop">▶</button>
       <button id="recBtn" class="rec" title="Rec">●</button>
+      <button id="smplModeBtn" title="Usa sample già registrato / Nuovo sample" style="display:none">Nuovo sample</button>
       <button id="micBtn" title="Microfono: registra voce/suoni dal vivo">🎤</button>
-      <button id="metroBtn" title="Metronomo">🔔</button>
-      <button id="countInBtn" title="Count-in: 1 battuta di conteggio prima del REC">1234</button>
+      <button id="countInBtn" title="Click: conto iniziale + metronomo durante la registrazione (non registrato)">Click</button>
       <button id="arpBtn" title="Arpeggiatore delle note suonate">ARP</button>
-      <div class="bpmbox"><button id="bpmDown">−</button><input id="bpmInput" type="number" min="40" max="240" step="1" value="120" title="Digita i BPM" /><span class="bpmunit">BPM</span><button id="bpmUp">+</button></div>
+      <div class="bpmbox"><button id="bpmDown">−</button><input id="bpmInput" type="number" min="40" max="240" step="1" value="82" title="Digita i BPM" /><span class="bpmunit">BPM</span><button id="bpmUp">+</button></div>
       <button id="octDown" class="sp">8va −</button>
       <button id="octUp">8va +</button>
       <button id="saveBtn" title="Salva progetto (strumento, BPM, tracce, drum, seq, fx)">💾</button>
@@ -272,7 +274,7 @@
       <button id="mixBtn" title="Mixer (volume/pan/mute per traccia)">🎚</button>
       <button id="copyBtn" title="Copia la traccia tape attiva">⧉Copy</button>
       <button id="pasteBtn" title="Incolla/posa sulla traccia tape attiva">⇩Paste</button>
-      <button id="splitBtn" title="Split: attiva, poi tocca una traccia per dividerla e sollevare la parte dopo il taglio">✂Split</button>
+      <button id="cutBtn" title="Cut: attiva e trascina i bordi sulla traccia attiva, poi tap al centro per tagliare">✂Cut</button>
       <button id="expWav" title="Esporta mix in WAV">⤓WAV</button>
       <button id="expMp3" title="Esporta mix in MP3">⤓MP3</button>
     </div>
@@ -491,7 +493,7 @@ function midiName(m){ return NOTE_NAMES[m % 12] + (Math.floor(m/12) - 1); }
 const State = {
   section: 'synth',
   octave: 0,            // -2..+2 transpose in octaves
-  bpm: 120,
+  bpm: 82,
   playing: false,
   recording: false,
   metro: false,
@@ -541,10 +543,10 @@ const State = {
   tape: {
     activeTrack: 0,     // 0..3 currently selected/armed track
     tracks: [           // each: {buffer, mute, vol, offset(sec)}
-      {buffer:null, mute:false, vol:90, offset:0, rate:1, reverse:false, pan:0},
-      {buffer:null, mute:false, vol:90, offset:0, rate:1, reverse:false, pan:0},
-      {buffer:null, mute:false, vol:90, offset:0, rate:1, reverse:false, pan:0},
-      {buffer:null, mute:false, vol:90, offset:0, rate:1, reverse:false, pan:0}
+      {buffer:null, mute:false, vol:90, offset:0, rate:1, reverse:false, pan:0, cutS:0, cutE:1},
+      {buffer:null, mute:false, vol:90, offset:0, rate:1, reverse:false, pan:0, cutS:0, cutE:1},
+      {buffer:null, mute:false, vol:90, offset:0, rate:1, reverse:false, pan:0, cutS:0, cutE:1},
+      {buffer:null, mute:false, vol:90, offset:0, rate:1, reverse:false, pan:0, cutS:0, cutE:1}
     ]
   },
   // arpeggiator (applies to notes held on the keyboard)
@@ -561,7 +563,8 @@ const State = {
     start: 0,           // 0..1 fraction of sample start
     end: 1,             // 0..1 fraction of sample end
     attack: 0.005,
-    release: 0.25
+    release: 0.25,
+    mode: 'new'         // 'new' = REC records a new sample | 'use' = play the sample; REC records to tape
   }
 };
 
@@ -1021,6 +1024,7 @@ const Tape = (() => {
     // (samples beyond capLen remain 0 = silence, completing the bar)
     State.tape.tracks[recTrack].buffer = buf;
     State.tape.tracks[recTrack].offset = 0;
+    State.tape.tracks[recTrack].cutS = 0; State.tape.tracks[recTrack].cutE = 1;
     toast('T'+(recTrack+1)+': '+bars+' battut'+(bars>1?'e':'a')+' · '+buf.duration.toFixed(1)+'s · peak '+peak.toFixed(2));
     capL = []; capR = []; capLen = 0;
     recTrack = -1;
@@ -1070,7 +1074,7 @@ const Tape = (() => {
     if((capturingFlag||armed) && recTrack===track){ stopRec(); }
     else { startRec(track); }
   }
-  function clearTrack(track){ State.tape.tracks[track].buffer = null; State.tape.tracks[track].offset=0; toast('Traccia '+(track+1)+' svuotata'); }
+  function clearTrack(track){ const t=State.tape.tracks[track]; t.buffer=null; t.offset=0; t.rate=1; t.reverse=false; if(playing) startPlay(); toast('Traccia '+(track+1)+' eliminata'); }
   function hasAudio(){ return State.tape.tracks.some(t=>t.buffer); }
   // ---- copy / paste ----
   let clipboard = null; // {buffer, vol, offset}
@@ -1116,29 +1120,24 @@ const Tape = (() => {
     return true;
   }
   function hasClipboard(){ return !!clipboard; }
-  // SPLIT + LIFT: cut the track at `frac` (0..1). Keep the first part on the track,
-  // put the second part into the clipboard so you can DROP (paste) it on any track.
-  function splitLift(track, frac){
+  // CUT: keep only the region [cutS, cutE] of the track, discarding the parts outside.
+  function applyCut(track){
     const t = State.tape.tracks[track];
     if(!t.buffer){ toast('T'+(track+1)+' è vuota'); return false; }
-    const ctx = AudioEngine.ensure();
-    const total = t.buffer.length;
-    let cut = Math.round(frac*total);
-    cut = Math.max(1, Math.min(total-1, cut));
-    const ch = t.buffer.numberOfChannels, sr = t.buffer.sampleRate;
-    const a = ctx.createBuffer(ch, cut, sr);          // first part (stays)
-    const b = ctx.createBuffer(ch, total-cut, sr);    // second part (lifted)
-    for(let c=0;c<ch;c++){ const src=t.buffer.getChannelData(c);
-      a.getChannelData(c).set(src.subarray(0,cut));
-      b.getChannelData(c).set(src.subarray(cut)); }
-    t.buffer = a;
-    clipboard = { buffer: b, vol: t.vol, offset: 0 };
-    toast('T'+(track+1)+' divisa — porzione sollevata (usa ⇩Paste per posarla)');
+    const s=Math.max(0,Math.min(t.cutS,t.cutE)), e=Math.min(1,Math.max(t.cutS,t.cutE));
+    if(e-s >= 0.999){ toast('Niente da tagliare'); return false; }
+    const ctx=AudioEngine.ensure();
+    const total=t.buffer.length, ch=t.buffer.numberOfChannels, sr=t.buffer.sampleRate;
+    const i0=Math.floor(s*total), i1=Math.max(i0+1,Math.floor(e*total));
+    const nb=ctx.createBuffer(ch, i1-i0, sr);
+    for(let c=0;c<ch;c++){ nb.getChannelData(c).set(t.buffer.getChannelData(c).subarray(i0,i1)); }
+    t.buffer=nb; t.cutS=0; t.cutE=1;
+    toast('T'+(track+1)+' tagliata ('+nb.duration.toFixed(1)+'s)');
     if(playing) startPlay();
     return true;
   }
   return { startRec, stopRec, isRecording, isArmed, capturing, captureFrame, diag, startPlay, stopPlay, toggleTrackRec, clearTrack, hasAudio,
-    copyTrack, pasteTrack, hasClipboard, splitLift,
+    copyTrack, pasteTrack, hasClipboard, applyCut,
     get recTrack(){ return recTrack; }, get playing(){ return playing; } };
 })();
 
@@ -1174,8 +1173,10 @@ const Sampler = (() => {
     const dL=buf.getChannelData(0), dR=buf.getChannelData(1);
     let off=0; for(let i=0;i<capL.length;i++){ dL.set(capL[i],off); dR.set(capR[i],off); off+=capL[i].length; }
     State.sampler.buffer=buf; State.sampler.start=0; State.sampler.end=1;
-    toast('Campione pronto ('+buf.duration.toFixed(1)+'s) — suonalo sui tasti');
+    State.sampler.mode='use';   // sample is ready -> switch to "use" so REC now records to tape
+    toast('Campione pronto — modalità "Usa sample". Ora ● registra sul tape');
     capL=[]; capR=[]; capLen=0;
+    if(typeof refreshSmplBtn==='function') refreshSmplBtn();
   }
   function toggleRec(){ if(capturingFlag||armed) stopRec(); else startRec(); }
   function clear(){ State.sampler.buffer=null; toast('Campione cancellato'); }
@@ -1352,7 +1353,7 @@ const Project = (() => {
     State.seq.pattern = p.seq.pattern;
     Object.assign(State.fx, p.fx||{});
     Object.assign(State.arp, p.arp||{});
-    if(p.sampler){ Object.assign(State.sampler, { baseNote:p.sampler.baseNote, start:p.sampler.start, end:p.sampler.end, attack:p.sampler.attack, release:p.sampler.release }); State.sampler.buffer = p.sampler.audio ? dataToBuf(p.sampler.audio) : null; }
+    if(p.sampler){ Object.assign(State.sampler, { baseNote:p.sampler.baseNote, start:p.sampler.start, end:p.sampler.end, attack:p.sampler.attack, release:p.sampler.release }); State.sampler.buffer = p.sampler.audio ? dataToBuf(p.sampler.audio) : null; State.sampler.mode = State.sampler.buffer ? 'use' : 'new'; }
     // tape
     Tape.stopPlay();
     (p.tape||[]).forEach((t,i)=>{
@@ -1673,6 +1674,7 @@ const Display = (() => {
     const _recBtn = document.getElementById('recBtn');
     const _recOn = Tape.isRecording() || (typeof Sampler!=='undefined' && Sampler.isRecording());
     if(_recBtn && _recBtn.classList.contains('on') !== _recOn){ _recBtn.classList.toggle('on', _recOn); State.recording=_recOn; }
+    if(!_recOn && window._metroForRec && !State.metro){ if(typeof Metro!=='undefined') Metro.stop(); window._metroForRec=false; }
     cx.clearRect(0,0,W,H);
     // background
     cx.fillStyle = '#0b0f14'; cx.fillRect(0,0,W,H);
@@ -1848,6 +1850,18 @@ const Display = (() => {
         cx.strokeStyle='rgba(255,255,255,.35)'; cx.lineWidth=1;
         cx.beginPath(); cx.moveTo(W/2, y+1); cx.lineTo(W/2, y+th-1); cx.stroke();
       }
+      // CUT markers on the active track when cut mode is on
+      if(active && tr.buffer && typeof cutMode!=='undefined' && cutMode){
+        const laneX=x0+26, laneW=gw-30;
+        const sX=laneX+tr.cutS*laneW, eX=laneX+tr.cutE*laneW;
+        cx.fillStyle='rgba(240,130,30,.22)'; cx.fillRect(laneX,y+1,sX-laneX,th-2); cx.fillRect(eX,y+1,laneX+laneW-eX,th-2);
+        cx.strokeStyle='#f0821e'; cx.lineWidth=2;
+        cx.beginPath(); cx.moveTo(sX,y+1); cx.lineTo(sX,y+th-1); cx.moveTo(eX,y+1); cx.lineTo(eX,y+th-1); cx.stroke();
+        // center "apply cut" marker
+        const midX=(sX+eX)/2;
+        cx.fillStyle='#f0821e'; cx.font='700 8px monospace'; cx.textAlign='center';
+        cx.fillText('✂ tap', midX, y+th*0.6); cx.textAlign='left';
+      }
     }
   }
   function drawSmpl(now, col){
@@ -1878,6 +1892,8 @@ const Display = (() => {
     // base note label
     cx.fillStyle='rgba(255,255,255,.7)'; cx.font='700 10px monospace'; cx.textAlign='right';
     cx.fillText('base '+midiName(sp.baseNote)+' · '+sp.buffer.duration.toFixed(1)+'s', W-6, 12); cx.textAlign='left';
+    cx.fillStyle='rgba(255,255,255,.4)'; cx.font='600 8px monospace'; cx.textAlign='center';
+    cx.fillText('trascina i bordi viola per tagliare · '+Math.round(sp.start*100)+'%–'+Math.round(sp.end*100)+'%', W/2, H-3); cx.textAlign='left';
   }
   function drawSynth(now, col){
     const s = State.synth;
@@ -1954,12 +1970,22 @@ function attachScreenTouch(){
       const i=Math.floor((py-y0)/th);
       if(i>=0&&i<4){
         State.tape.activeTrack=i; refreshEncoders();
-        if(typeof splitMode!=='undefined' && splitMode){
-          // split the tapped track at the tapped x (within the waveform area)
+        const t=State.tape.tracks[i];
+        if(typeof cutMode!=='undefined' && cutMode && t.buffer){
+          // cut UI on this lane's waveform area
           const laneX=x0+26, laneW=gw-30;
-          const frac=Math.max(0.02,Math.min(0.98,(px-laneX)/laneW));
-          Tape.splitLift(i, frac);
-          splitMode=false; document.getElementById('splitBtn').classList.remove('on');
+          const relX=(px-laneX)/laneW;
+          const sX=laneX+t.cutS*laneW, eX=laneX+t.cutE*laneW, midX=(sX+eX)/2;
+          // tap near the middle of the keep-region -> APPLY the cut
+          if(Math.abs(px-midX) < laneW*0.12){
+            Tape.applyCut(i);
+            cutMode=false; document.getElementById('cutBtn').classList.remove('on');
+            refreshNumRow(); return;
+          }
+          // otherwise grab the nearer cut edge to drag it
+          const edge = Math.abs(px-sX) <= Math.abs(px-eX) ? 'cutS' : 'cutE';
+          drag = { cut:true, track:i, edge, laneX, laneW };
+          moveDrag(clientX);
           refreshNumRow(); return;
         }
         // otherwise begin a drag on this lane (to move the track in time)
@@ -1969,6 +1995,15 @@ function attachScreenTouch(){
       // tap cycles engine
       const i=(ENGINES.indexOf(State.synth.engine)+1)%ENGINES.length;
       State.synth.engine=ENGINES[i]; refreshEncoders(); toast('Engine: '+ENGINE_LABELS[ENGINES[i]]);
+    } else if(sec==='smpl'){
+      // grab the nearest trim marker (start/end) on the waveform to drag it
+      const sp=State.sampler; if(!sp.buffer) { refreshNumRow(); return; }
+      const x0=6, gw=W-12;
+      const sx=x0+sp.start*gw, ex=x0+sp.end*gw;
+      const which = Math.abs(px-sx) <= Math.abs(px-ex) ? 'start' : 'end';
+      drag = { smpl:true, edge:which };
+      // move immediately to the tapped position
+      moveSmplDrag(clientX);
     } else if(sec==='fx'){
       // tap a row and set value by x position
       const y0=26,rowH=(H-30)/4, bx=6+52, bw=(W-12)-80;
@@ -1984,8 +2019,27 @@ function attachScreenTouch(){
   }
   // drag state for moving tape tracks in time
   let drag = null;
+  function moveSmplDrag(clientX){
+    const sp=State.sampler; if(!sp.buffer) return;
+    const r = cv.getBoundingClientRect();
+    const W = Display.W; if(!W) return;
+    const x0=6, gw=W-12;
+    let frac = Math.max(0, Math.min(1, (clientX - r.left - x0)/gw));
+    if(drag.edge==='start'){ sp.start = Math.min(frac, sp.end-0.02); if(sp.start<0)sp.start=0; }
+    else { sp.end = Math.max(frac, sp.start+0.02); if(sp.end>1)sp.end=1; }
+    refreshEncoders();
+  }
   function moveDrag(clientX){
     if(!drag) return;
+    if(drag.smpl){ moveSmplDrag(clientX); return; }
+    if(drag.cut){
+      const r = cv.getBoundingClientRect();
+      let frac = Math.max(0, Math.min(1, (clientX - r.left - drag.laneX)/drag.laneW));
+      const t = State.tape.tracks[drag.track];
+      if(drag.edge==='cutS'){ t.cutS = Math.min(frac, t.cutE-0.02); if(t.cutS<0)t.cutS=0; }
+      else { t.cutE = Math.max(frac, t.cutS+0.02); if(t.cutE>1)t.cutE=1; }
+      return;
+    }
     const r = cv.getBoundingClientRect();
     const px = clientX - r.left;
     const W = Display.W; if(!W) return;
@@ -2000,6 +2054,16 @@ function attachScreenTouch(){
     if(Math.abs(dx)>3) drag.moved = true;
   }
   function endDrag(){
+    if(drag && drag.cut){
+      const t=State.tape.tracks[drag.track];
+      toast('Cut '+Math.round(t.cutS*100)+'%–'+Math.round(t.cutE*100)+'% · tap al centro per tagliare');
+      drag=null; return;
+    }
+    if(drag && drag.smpl){
+      const sp=State.sampler;
+      toast('Campione: '+Math.round(sp.start*100)+'%–'+Math.round(sp.end*100)+'%');
+      drag=null; return;
+    }
     if(drag && drag.moved){
       const off = State.tape.tracks[drag.track].offset;
       toast('T'+(drag.track+1)+' spostata a '+(off>=0?'+':'')+off.toFixed(2)+'s');
@@ -2024,6 +2088,7 @@ function setSection(sec){
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('active', b.dataset.sec===sec));
   refreshEncoders();
   refreshNumRow();
+  if(typeof refreshSmplBtn==='function') refreshSmplBtn();
 }
 document.querySelectorAll('#tabs button[data-sec]').forEach(b=>{
   b.addEventListener('click', ()=>{ AudioEngine.ensure(); AudioEngine.resume(); setSection(b.dataset.sec); });
@@ -2149,8 +2214,9 @@ document.getElementById('playBtn').addEventListener('click', ()=>{
 });
 document.getElementById('recBtn').addEventListener('click', ()=>{
   AudioEngine.ensure(); AudioEngine.resume();
-  // In the SMPL section, REC records a short sample instead of a tape track.
-  if(State.section === 'smpl'){
+  // In SMPL 'new' mode (or if no sample yet), REC records a NEW sample.
+  // In SMPL 'use' mode, REC records the played sample onto a tape track (fall through).
+  if(State.section === 'smpl' && (State.sampler.mode==='new' || !State.sampler.buffer)){
     Sampler.toggleRec();
     const on = Sampler.isRecording();
     State.recording = on;
@@ -2161,6 +2227,8 @@ document.getElementById('recBtn').addEventListener('click', ()=>{
   // synth, drum machine, sequencer — whatever is playing.
   if(Tape.isRecording()){
     Tape.stopRec();
+    if(window._metroForRec && !State.metro){ Metro.stop(); }
+    window._metroForRec = false;
   } else {
     // pick the currently selected tape track; if it already has audio, jump to next empty one
     let tk = State.tape.activeTrack;
@@ -2169,9 +2237,12 @@ document.getElementById('recBtn').addEventListener('click', ()=>{
       if(empty >= 0){ tk = empty; State.tape.activeTrack = empty; }
     }
     if(State.countIn){
-      toast('Count-in… 1 · 2 · 3 · 4');
+      toast('Click… 1 · 2 · 3 · 4');
       document.getElementById('recBtn').classList.add('on');
-      Metro.countIn(()=>{ Tape.startRec(tk); });
+      Metro.countIn(()=>{
+        Tape.startRec(tk);
+        if(!Metro.running){ Metro.start(); window._metroForRec = true; }  // keep clicking during rec (monitor only)
+      });
     } else {
       Tape.startRec(tk);
       if(State.section !== 'tape') toast('REC su T'+(tk+1)+' — suona (● per fermare)');
@@ -2181,17 +2252,10 @@ document.getElementById('recBtn').addEventListener('click', ()=>{
   State.recording = on;
   document.getElementById('recBtn').classList.toggle('on', on);
 });
-document.getElementById('metroBtn').addEventListener('click', ()=>{
-  AudioEngine.ensure(); AudioEngine.resume();
-  State.metro = !State.metro;
-  document.getElementById('metroBtn').classList.toggle('on', State.metro);
-  if(State.metro) Metro.start(); else Metro.stop();
-  toast('Metronomo '+(State.metro?'on':'off'));
-});
 document.getElementById('countInBtn').addEventListener('click', ()=>{
   State.countIn = !State.countIn;
   document.getElementById('countInBtn').classList.toggle('on', State.countIn);
-  toast('Count-in '+(State.countIn?'on (1 battuta prima del REC)':'off'));
+  toast('Click '+(State.countIn?'on — conto iniziale + metronomo durante il rec':'off'));
 });
 // MIC: toggle microphone as a recording source
 document.getElementById('micBtn').addEventListener('click', async ()=>{
@@ -2204,6 +2268,24 @@ document.getElementById('micBtn').addEventListener('click', async ()=>{
     if(ok){ btn.classList.add('on'); toast('Microfono ON — premi ● per registrare'); }
     else { toast('Microfono negato o non disponibile'); }
   }
+});
+// Sample mode toggle: 'new' (REC records a new sample) <-> 'use' (REC records the played sample to tape)
+function refreshSmplBtn(){
+  const btn=document.getElementById('smplModeBtn'); if(!btn) return;
+  const show = (State.section==='smpl');
+  btn.style.display = show ? '' : 'none';
+  if(!show) return;
+  const useMode = State.sampler.mode==='use' && State.sampler.buffer;
+  btn.textContent = useMode ? '🎹 Usa sample' : '● Nuovo sample';
+  btn.classList.toggle('on', useMode);
+  if(!State.sampler.buffer) btn.textContent='● Nuovo sample';
+}
+document.getElementById('smplModeBtn').addEventListener('click', ()=>{
+  AudioEngine.ensure(); AudioEngine.resume();
+  if(!State.sampler.buffer){ toast('Registra prima un campione (●)'); return; }
+  State.sampler.mode = (State.sampler.mode==='use') ? 'new' : 'use';
+  refreshSmplBtn();
+  toast(State.sampler.mode==='use' ? 'Usa sample: ● registra il sample sul tape' : 'Nuovo sample: ● registra un nuovo campione');
 });
 // ARP: cycle off -> up -> down -> updown -> random -> off
 const ARP_CYCLE = [null,'up','down','updown','random'];
@@ -2236,13 +2318,13 @@ document.getElementById('expWav').addEventListener('click', ()=>Export.exportAs(
 document.getElementById('expMp3').addEventListener('click', ()=>Export.exportAs('mp3'));
 document.getElementById('copyBtn').addEventListener('click', ()=>{ AudioEngine.ensure(); Tape.copyTrack(State.tape.activeTrack); });
 document.getElementById('pasteBtn').addEventListener('click', ()=>{ AudioEngine.ensure(); AudioEngine.resume(); if(State.section!=='tape') setSection('tape'); Tape.pasteTrack(State.tape.activeTrack); });
-let splitMode = false;
-document.getElementById('splitBtn').addEventListener('click', ()=>{
+let cutMode = false;
+document.getElementById('cutBtn').addEventListener('click', ()=>{
   AudioEngine.ensure(); AudioEngine.resume();
   if(State.section!=='tape') setSection('tape');
-  splitMode = !splitMode;
-  document.getElementById('splitBtn').classList.toggle('on', splitMode);
-  toast(splitMode ? 'Split ON — tocca una traccia dove tagliare' : 'Split off');
+  cutMode = !cutMode;
+  document.getElementById('cutBtn').classList.toggle('on', cutMode);
+  toast(cutMode ? 'Cut ON — trascina i bordi, poi tap al centro per tagliare' : 'Cut off');
 });
 
 /* ---------- Save / Load dialog ---------- */
@@ -2287,11 +2369,13 @@ function renderMixer(){
       '<input class="vsl" type="range" min="0" max="120" value="'+t.vol+'">'+
       '<div class="vval">'+t.vol+'%</div>'+
       '<div class="prow"><input class="psl" type="range" min="-100" max="100" value="'+Math.round((t.pan||0)*100)+'"><span class="plbl">PAN</span></div>'+
-      '<button class="mbtn '+(t.mute?'on':'')+'">'+(t.mute?'MUTE':'ON')+'</button>';
-    const vsl=s.querySelector('.vsl'), vval=s.querySelector('.vval'), psl=s.querySelector('.psl'), mbtn=s.querySelector('.mbtn');
+      '<button class="mbtn '+(t.mute?'on':'')+'">'+(t.mute?'MUTE':'ON')+'</button>'+
+      '<button class="delbtn"'+(t.buffer?'':' disabled')+'>🗑</button>';
+    const vsl=s.querySelector('.vsl'), vval=s.querySelector('.vval'), psl=s.querySelector('.psl'), mbtn=s.querySelector('.mbtn'), delbtn=s.querySelector('.delbtn');
     vsl.addEventListener('input', ()=>{ t.vol=+vsl.value; vval.textContent=t.vol+'%'; if(Tape.playing) Tape.startPlay(); });
     psl.addEventListener('input', ()=>{ t.pan=(+psl.value)/100; if(Tape.playing) Tape.startPlay(); });
     mbtn.addEventListener('click', ()=>{ t.mute=!t.mute; mbtn.classList.toggle('on',t.mute); mbtn.textContent=t.mute?'MUTE':'ON'; if(Tape.playing) Tape.startPlay(); });
+    delbtn.addEventListener('click', ()=>{ if(!t.buffer) return; if(confirm('Eliminare la traccia T'+(i+1)+'?')){ Tape.clearTrack(i); renderMixer(); } });
     wrap.appendChild(s);
   });
 }
