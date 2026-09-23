@@ -1,5 +1,5 @@
 /* op-Crudo service worker — offline-first PWA caching */
-const CACHE = 'op-crudo-v14';
+const CACHE = 'op-crudo-v15';
 const ASSETS = [
   './',
   './index.html',
