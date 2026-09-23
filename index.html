@@ -80,7 +80,8 @@
   /* functional 1-8 keys row */
   #numrow{flex:0 0 auto;display:flex;gap:4px;margin-top:4px;height:clamp(18px, 4.5dvh, 26px);}
   .numk{flex:1 1 0;min-width:0;height:100%;border:1.5px solid #0002;background:#efece5;border-radius:6px;cursor:pointer;
-    display:flex;flex-direction:row;align-items:center;justify-content:center;gap:3px;padding:0 3px;color:var(--ink);overflow:hidden;}
+    display:flex;flex-direction:row;align-items:center;justify-content:center;gap:3px;padding:0 3px;color:var(--ink);overflow:hidden;
+    touch-action:none;user-select:none;-webkit-user-select:none;}
   .numk b{font-size:11px;font-weight:900;line-height:1;flex:0 0 auto;}
   .numk span{font-size:8px;font-weight:800;opacity:.55;line-height:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
   .numk.active{background:var(--ink);color:#f4f1ea;border-color:#000;}
@@ -157,6 +158,33 @@
   .mstrip .mbtn.on{background:var(--ink);color:#f4f1ea;border-color:#000;}
   @media (max-height:520px){ .mstrip .vsl{height:90px;} }
 
+  /* ---- HiCrudo panel ---- */
+  #tabs #hiTab{background:var(--orange);color:#fff;border-color:#0003;}
+  #hiPanel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:82;display:none;flex-direction:column;gap:10px;
+    background:linear-gradient(180deg,#efeae2,#ded8cd);border:2px solid #b9b0a0;border-radius:16px;padding:14px;
+    box-shadow:0 6px 24px rgba(0,0,0,.5);width:min(97vw,760px);max-height:96dvh;overflow:auto;}
+  #hiPanel.show{display:flex;}
+  #hiPanel .hitop{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;}
+  #hiPanel .hibrand{font-weight:900;font-style:italic;font-size:18px;color:#2b2118;}
+  #hiPanel .hidisplay{flex:1 1 auto;min-width:0;background:#12303a;color:#7fe3c0;font-family:monospace;font-weight:800;font-size:11px;border-radius:5px;padding:5px 6px;text-align:center;white-space:nowrap;overflow:hidden;}
+  #hiPanel .hib{width:34px;height:30px;border-radius:7px;border:2px solid rgba(0,0,0,.25);font-size:14px;font-weight:800;cursor:pointer;color:#2b2118;flex:0 0 auto;padding:0;}
+  #hiPanel .hib.key{background:#c9c2b5;}#hiPanel .hib.wave{background:#f2c53d;padding:0;}#hiPanel .hib.arp{background:#f0821e;color:#fff;}#hiPanel .hib.close{background:#efe2c4;}
+  #hiPanel .hib.wave canvas{display:block;margin:auto;}
+  #hiPanel .hib.on{outline:3px solid #2b2118;}
+  #hiPanel .hibody{display:flex;gap:12px;align-items:flex-start;}
+  #hiPanel .hijoywrap{display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 0 auto;}
+  #hiPanel .hijoy{width:118px;height:118px;border-radius:50%;background:radial-gradient(circle at 45% 40%,#2a2a30,#0c0c0e);border:3px solid #b9b0a0;box-shadow:0 3px 6px rgba(0,0,0,.4),inset 0 2px 6px rgba(0,0,0,.8);position:relative;cursor:grab;touch-action:none;}
+  #hiPanel .hijoystick{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#fbf8f0,#cfc7b6);border:2px solid #8f877a;box-shadow:0 2px 4px rgba(0,0,0,.5);pointer-events:none;}
+  #hiPanel .hiknoblbl{font-size:10px;font-weight:800;color:#2b2118;opacity:.7;}
+  #hiPanel .hipads{flex:1 1 auto;display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start;}
+  #hiPanel .hipad{border-radius:12px;border:2px solid #cfc7b6;background:linear-gradient(180deg,#f7f2e6,#e9e1d0);
+    box-shadow:0 3px 0 #cfc7b6, inset 0 1px 2px #fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;color:#2b2118;user-select:none;-webkit-user-select:none;touch-action:none;}
+  #hiPanel .hipad.small{flex:1 1 30%;height:64px;}
+  #hiPanel .hipad.big{flex:1 1 22%;height:104px;}
+  #hiPanel .hipad .deg{font-size:20px;}#hiPanel .hipad .nm{font-size:12px;opacity:.65;}
+  #hiPanel .hipad.hit{background:linear-gradient(180deg,#ffd9c9,#ffb79c);border-color:#f0821e;}
+  @media (max-height:520px){#hiPanel .hipad.small{height:48px;} #hiPanel .hipad.big{height:74px;} #hiPanel .hijoy{width:92px;height:92px;} #hiPanel .hijoystick{width:38px;height:38px;margin:-19px 0 0 -19px;} }
+
   #toast{position:fixed;left:50%;bottom:6px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#f4f1ea;
     padding:6px 12px;border-radius:10px;font-size:11px;font-weight:700;z-index:60;opacity:0;transition:all .3s;pointer-events:none;max-width:90vw;text-align:center;}
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
@@ -200,6 +228,7 @@
       <button data-sec="tape">TAPE</button>
       <button data-sec="seq">SEQ</button>
       <button data-sec="fx">FX</button>
+      <button id="hiTab" title="HiCrudo — synth di accordi">HiCrudo</button>
     </div>
   </div>
 
@@ -263,6 +292,22 @@
   <div id="mixStrips"></div>
 </div></div>
 
+<!-- HiCrudo panel (chord synth) -->
+<div id="hiPanel">
+  <div class="hitop">
+    <div class="hibrand">HiCrudo</div>
+    <button class="hib arp" id="hiArpBtn" title="Arpeggiatore">🕐</button>
+    <div class="hidisplay" id="hiDisplay">Do Maggiore</div>
+    <button class="hib key" id="hiKeyBtn" title="Cambia tonalità">🔑</button>
+    <button class="hib wave" id="hiWaveBtn" title="Forma d'onda"><canvas id="hiWaveCv" width="28" height="20"></canvas></button>
+    <button class="hib close" id="hiClose" title="Chiudi">✕</button>
+  </div>
+  <div class="hibody">
+    <div class="hijoywrap"><div class="hijoy" id="hiJoy"><div class="hijoystick" id="hiStick"></div></div><span class="hiknoblbl">TONO / TIPO</span></div>
+    <div class="hipads" id="hiPads"></div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script src="lame.min.js"></script>
@@ -278,7 +323,9 @@ const AudioEngine = (() => {
   let ctx = null, master = null, comp = null, fxIn = null, tap = null, recMix = null, micStream = null, micNode = null, micGain = null, monitorBus = null;
   function ensure(){
     if(ctx) return ctx;
-    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    try { ctx = new AC({ latencyHint: 'interactive' }); }
+    catch(e){ ctx = new AC(); }
     master = ctx.createGain(); master.gain.value = 0.9;
     comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -10; comp.knee.value = 20; comp.ratio.value = 4;
@@ -1988,13 +2035,23 @@ document.querySelectorAll('#tabs button').forEach(b=>{
    FX   : 1-4 quick presets (dry / space / dub / crush)
 */
 function numKeyAction(n){
-  AudioEngine.ensure(); AudioEngine.resume();
   const sec = State.section;
+  // DRUM: lowest-latency path — trigger the sound FIRST, before any UI work.
+  if(sec==='drum'){
+    const name = DRUMS[n];
+    if(name){
+      const ctx = AudioEngine.ensure(); if(ctx.state==='suspended') ctx.resume();
+      playDrum(name, ctx.currentTime, false);   // fire immediately, no scheduling delay
+      State.drum.selected = name;
+      refreshNumRow();                           // light: just updates highlights
+    }
+    return;
+  }
+  AudioEngine.ensure(); AudioEngine.resume();
   if(sec==='synth'){
     if(n<ENGINES.length){ State.synth.engine = ENGINES[n]; toast('Engine: '+ENGINE_LABELS[ENGINES[n]]); }
-  } else if(sec==='drum'){
-    State.drum.selected = DRUMS[n]; toast('Drum: '+DRUM_LABELS[DRUMS[n]]);
-    playDrum(DRUMS[n], AudioEngine.now()+0.001, false);
+  } else if(false){
+    // (drum handled above)
   } else if(sec==='tape'){
     if(n<4){ State.tape.activeTrack = n; toast('Traccia '+(n+1)); }
     else {
@@ -2060,7 +2117,11 @@ function refreshNumRow(){
   }
 }
 document.querySelectorAll('.numk').forEach(btn=>{
-  btn.addEventListener('click', ()=>numKeyAction(+btn.dataset.num));
+  // pointerdown fires immediately (no 300ms click delay) and handles rapid repeated
+  // taps reliably, so drum pads trigger every single hit at low latency.
+  btn.addEventListener('pointerdown', (e)=>{ e.preventDefault(); numKeyAction(+btn.dataset.num); }, {passive:false});
+  // fallback for very old browsers without Pointer Events
+  if(!window.PointerEvent){ btn.addEventListener('touchstart', (e)=>{ e.preventDefault(); numKeyAction(+btn.dataset.num); }, {passive:false}); btn.addEventListener('mousedown', ()=>numKeyAction(+btn.dataset.num)); }
 });
 // number keys 1-8 on computer keyboard
 window.addEventListener('keydown', e=>{
@@ -2235,6 +2296,108 @@ function renderMixer(){
 document.getElementById('mixBtn').addEventListener('click', ()=>{ AudioEngine.ensure(); AudioEngine.resume(); renderMixer(); mixDlg.classList.add('show'); });
 document.getElementById('mixClose').addEventListener('click', ()=>mixDlg.classList.remove('show'));
 mixDlg.addEventListener('click', e=>{ if(e.target===mixDlg) mixDlg.classList.remove('show'); });
+
+/* ---------- HiCrudo: chord synth (adapted from CrudoBeat) ----------
+   Plays diatonic chords through AudioEngine.master, so REC/tape/FX all apply.
+   Shares the app's scale (SCALES[State.seq.scaleIdx]) and root (State.seq.root). */
+const HiCrudo = (() => {
+  let hiWave='sawtooth', hiTone=0.5, hiJX=0, hiJY=0, hiArp=false;
+  const voices = new Map();   // deg -> voice
+  const HI_WAVES=['sawtooth','square','triangle','sine'];
+  const HI_ROMAN=['I','ii','iii','IV','V','vi','vii°','VIII','IX'];
+  function scaleSteps(){ return SCALES[State.seq.scaleIdx].steps; }
+  function scaleLen(){ return scaleSteps().length; }
+  function chordDegrees(deg,type){
+    if(type==='sus2')return [deg,deg+1,deg+4];
+    if(type==='sus4')return [deg,deg+3,deg+4];
+    if(type==='6th') return [deg,deg+2,deg+4,deg+5];
+    if(type==='7th') return [deg,deg+2,deg+4,deg+6];
+    if(type==='9th') return [deg,deg+2,deg+4,deg+6,deg+8];
+    return [deg,deg+2,deg+4];
+  }
+  function chordType(){ const x=hiJX,y=hiJY;
+    if(y<-0.55) return (Math.abs(x)>0.5)?'9th':'7th';
+    if(y>0.55) return '6th';
+    if(x<-0.55) return 'sus2';
+    if(x>0.55) return 'sus4';
+    return 'base';
+  }
+  const CHORD_LABEL={base:'',sus2:'sus2',sus4:'sus4','6th':'6','7th':'7','9th':'9'};
+  function degToMidi(s){ const sc=scaleSteps(), L=sc.length; const o=Math.floor(s/L), dd=((s%L)+L)%L; return State.seq.root + o*12 + sc[dd] + State.octave*12; }
+  function chordMidis(deg,type){ return chordDegrees(deg,type||'base').map(degToMidi); }
+  function cutoff(freq){ return freq*(1.5+hiTone*6)+400+hiTone*2000; }
+  function rootName(deg){ const sc=scaleSteps(),L=sc.length,dd=((deg%L)+L)%L; const midi=State.seq.root+sc[dd]; return NOTE_NAMES[((midi%12)+12)%12]; }
+  function start(deg){
+    stop(deg);
+    const ctx=AudioEngine.ensure(); if(ctx.state==='suspended') ctx.resume();
+    const type=chordType(); const ms=chordMidis(deg,type); const now=ctx.currentTime;
+    const vg=ctx.createGain(); vg.gain.setValueAtTime(0,now); vg.gain.linearRampToValueAtTime(0.22,now+0.02); vg.connect(AudioEngine.master);
+    const filters=[],oscs=[];
+    const startNote=(freq,t)=>{
+      const o=ctx.createOscillator(); o.type=hiWave; o.frequency.value=freq;
+      const o2=ctx.createOscillator(); o2.type=hiWave; o2.frequency.value=freq*1.005; const o2g=ctx.createGain(); o2g.gain.value=0.5;
+      const f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=cutoff(freq); f.Q.value=2+Math.abs(hiJX)*6; f._freq=freq;
+      o.connect(f); o2.connect(o2g); o2g.connect(f); f.connect(vg); o.start(t); o2.start(t);
+      filters.push(f); oscs.push(o,o2);
+    };
+    if(hiArp){ const st=Math.max(0.09,(60/State.bpm)/2); ms.forEach((m,i)=>startNote(midiToFreq(m),now+i*st)); }
+    else { ms.forEach(m=>startNote(midiToFreq(m),now)); }
+    voices.set(deg,{vg,filters,oscs,type});
+    return type;
+  }
+  function stop(deg){
+    const v=voices.get(deg); if(!v) return; const ctx=AudioEngine.ctx, now=ctx.currentTime;
+    v.vg.gain.cancelScheduledValues(now); v.vg.gain.setValueAtTime(v.vg.gain.value,now); v.vg.gain.exponentialRampToValueAtTime(0.0005,now+0.4);
+    v.oscs.forEach(o=>{ try{o.stop(now+0.45);}catch(e){} }); voices.delete(deg);
+  }
+  function modulateLive(){ if(!AudioEngine.ctx) return; const t=AudioEngine.ctx.currentTime; for(const[,v]of voices){ for(const f of v.filters){ f.frequency.setTargetAtTime(cutoff(f._freq),t,0.03); f.Q.setTargetAtTime(2+Math.abs(hiJX)*6,t,0.03); } } }
+  // --- UI ---
+  const padsEl=()=>document.getElementById('hiPads');
+  const dispEl=()=>document.getElementById('hiDisplay');
+  function buildPads(){
+    const el=padsEl(); if(!el) return; el.innerHTML='';
+    if(dispEl()) dispEl().textContent = NOTE_NAMES[((State.seq.root%12)+12)%12]+' '+SCALES[State.seq.scaleIdx].name;
+    const L=scaleLen(); const n=(L>=7)?9:Math.min(L+2,L*2);
+    for(let d=0;d<n;d++){
+      const pad=document.createElement('div'); pad.className='hipad '+(d<3?'small':'big');
+      const deg=document.createElement('div'); deg.className='deg'; deg.textContent=(L>=7?HI_ROMAN[d]:('°'+(d+1)));
+      const nm=document.createElement('div'); nm.className='nm'; nm.textContent=rootName(d)+(d>=L?'▲':'');
+      pad.appendChild(deg); pad.appendChild(nm);
+      const press=()=>{ const type=start(d); pad.classList.add('hit'); if(dispEl()){ const lab=CHORD_LABEL[type]||''; dispEl().textContent=rootName(d)+(lab?(' '+lab):'')+' • '+NOTE_NAMES[((State.seq.root%12)+12)%12]; } };
+      const release=()=>{ stop(d); pad.classList.remove('hit'); };
+      pad.addEventListener('pointerdown',(e)=>{ e.preventDefault(); press(); },{passive:false});
+      pad.addEventListener('pointerup',release); pad.addEventListener('pointerleave',()=>{ if(pad.classList.contains('hit')) release(); });
+      pad.addEventListener('pointercancel',release);
+      el.appendChild(pad);
+    }
+  }
+  function drawWave(){ const cv=document.getElementById('hiWaveCv'); if(!cv) return; const c=cv.getContext('2d'),w=cv.width,h=cv.height; c.clearRect(0,0,w,h); c.strokeStyle='#2b2118'; c.lineWidth=2; c.beginPath();
+    for(let x=0;x<=w;x++){ const p=x/w*2*Math.PI; let y;
+      if(hiWave==='sine')y=Math.sin(p); else if(hiWave==='square')y=(x%w<w/2)?-1:1; else if(hiWave==='triangle')y=(4/w)*Math.abs(((x-w/4)%w+w)%w-w/2)-1; else y=((x/w)%1)*2-1;
+      const py=h/2-y*(h/2-3); if(x===0)c.moveTo(x,py); else c.lineTo(x,py); }
+    c.stroke(); }
+  function updateJoy(){ const st=document.getElementById('hiStick'); if(!st) return; const R=27; st.style.transform='translate('+(hiJX*R)+'px,'+(hiJY*R)+'px)'; }
+  let wired=false;
+  function wire(){
+    if(wired) return; wired=true;
+    document.getElementById('hiKeyBtn').addEventListener('click', ()=>{ State.seq.root = 48 + ((State.seq.root-48+1)%12); buildPads(); refreshEncoders(); toast('Tonalità: '+NOTE_NAMES[((State.seq.root%12)+12)%12]); });
+    document.getElementById('hiWaveBtn').addEventListener('click', ()=>{ const i=(HI_WAVES.indexOf(hiWave)+1)%HI_WAVES.length; hiWave=HI_WAVES[i]; drawWave(); toast('HiCrudo onda: '+hiWave); });
+    document.getElementById('hiArpBtn').addEventListener('click', ()=>{ hiArp=!hiArp; document.getElementById('hiArpBtn').classList.toggle('on',hiArp); toast('Arpeggio '+(hiArp?'ON':'OFF')); });
+    document.getElementById('hiClose').addEventListener('click', close);
+    const joy=document.getElementById('hiJoy'); let pid=null;
+    const set=(cx,cy)=>{ const r=joy.getBoundingClientRect(); const half=(r.width||92)/2; const jx=r.left+r.width/2, jy=r.top+r.height/2; let dx=(cx-jx)/half, dy=(cy-jy)/half; const mag=Math.hypot(dx,dy); if(mag>1){dx/=mag;dy/=mag;} hiJX=dx;hiJY=dy;hiTone=Math.max(0,Math.min(1,0.5-hiJY*0.5)); updateJoy(); modulateLive(); };
+    const up=()=>{ if(pid===null)return; pid=null; joy.style.cursor='grab'; hiJX=0;hiJY=0;hiTone=0.5; updateJoy(); modulateLive(); };
+    joy.addEventListener('pointerdown',(e)=>{ if(pid!==null)return; pid=e.pointerId; e.preventDefault(); try{joy.setPointerCapture(e.pointerId);}catch(_){} joy.style.cursor='grabbing'; set(e.clientX,e.clientY); });
+    joy.addEventListener('pointermove',(e)=>{ if(e.pointerId!==pid)return; e.preventDefault(); set(e.clientX,e.clientY); });
+    joy.addEventListener('pointerup',(e)=>{ if(e.pointerId!==pid)return; try{joy.releasePointerCapture(e.pointerId);}catch(_){} up(); });
+    joy.addEventListener('pointercancel',(e)=>{ if(e.pointerId!==pid)return; up(); });
+    drawWave(); updateJoy();
+  }
+  function open(){ AudioEngine.ensure(); AudioEngine.resume(); wire(); buildPads(); document.getElementById('hiPanel').classList.add('show'); }
+  function close(){ voices.forEach((_,d)=>stop(d)); document.getElementById('hiPanel').classList.remove('show'); }
+  return { open, close, buildPads };
+})();
+document.getElementById('hiTab').addEventListener('click', ()=>HiCrudo.open());
 
 /* ---------- Orientation ---------- */
 function checkOrientation(){
