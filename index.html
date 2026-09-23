@@ -2016,14 +2016,16 @@ function attachScreenTouch(){
 }
 
 /* ---------- Section tabs ---------- */
+const VALID_SECTIONS = ['synth','smpl','drum','tape','seq','fx'];
 function setSection(sec){
+  if(!VALID_SECTIONS.includes(sec)) return;   // ignore non-section tabs (e.g. HiCrudo)
   State.section = sec;
   document.body.setAttribute('data-section', sec);
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('active', b.dataset.sec===sec));
   refreshEncoders();
   refreshNumRow();
 }
-document.querySelectorAll('#tabs button').forEach(b=>{
+document.querySelectorAll('#tabs button[data-sec]').forEach(b=>{
   b.addEventListener('click', ()=>{ AudioEngine.ensure(); AudioEngine.resume(); setSection(b.dataset.sec); });
 });
 
