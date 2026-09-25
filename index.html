@@ -379,13 +379,28 @@ const AudioEngine = (() => {
   async function enableMic(){
     ensure(); resume();
     if(micNode) return true;
+    // High-quality capture: turn OFF the browser's voice-call DSP (echo cancel,
+    // noise suppression, auto gain) — it compresses dynamics and colours the sound,
+    // which hurts music/instrument recording. Request the highest rate/channels.
+    const hifi = {
+      echoCancellation:false, noiseSuppression:false, autoGainControl:false,
+      channelCount:2, sampleRate:48000, sampleSize:16
+    };
     try {
-      micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true } });
-      micNode = ctx.createMediaStreamSource(micStream);
-      micNode.connect(micGain);
-      micGain.gain.value = 1;
-      return true;
-    } catch(e){ return false; }
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: hifi, video:false });
+    } catch(e){
+      // some browsers reject strict constraints -> retry with just the DSP disabled
+      try { micStream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } }); }
+      catch(e2){
+        // last resort: default audio
+        try { micStream = await navigator.mediaDevices.getUserMedia({ audio:true }); }
+        catch(e3){ return false; }
+      }
+    }
+    micNode = ctx.createMediaStreamSource(micStream);
+    micNode.connect(micGain);
+    micGain.gain.value = 1;
+    return true;
   }
   function disableMic(){
     if(micGain) micGain.gain.value = 0;
@@ -1270,7 +1285,7 @@ const Export = (() => {
   function encodeMP3(buf){
     if(typeof lamejs === 'undefined') { toast('Encoder MP3 non disponibile'); return null; }
     const numCh = Math.min(2, buf.numberOfChannels), sr = buf.sampleRate;
-    const enc = new lamejs.Mp3Encoder(numCh, sr, 128);
+    const enc = new lamejs.Mp3Encoder(numCh, sr, 256);
     const L = buf.getChannelData(0);
     const R = numCh>1 ? buf.getChannelData(1) : L;
     const toInt16 = f=>{ const o=new Int16Array(f.length); for(let i=0;i<f.length;i++){ const s=Math.max(-1,Math.min(1,f[i])); o[i]=s<0?s*0x8000:s*0x7FFF; } return o; };
