@@ -333,17 +333,26 @@
 
 /* ---------- Audio engine (single shared context) ---------- */
 const AudioEngine = (() => {
-  let ctx = null, master = null, comp = null, fxIn = null, tap = null, recMix = null, micStream = null, micNode = null, micGain = null, monitorBus = null;
+  let ctx = null, master = null, comp = null, fxIn = null, tap = null, recMix = null, micStream = null, micNode = null, micGain = null, monitorBus = null, outBus = null, limiter = null;
   function ensure(){
     if(ctx) return ctx;
     const AC = window.AudioContext || window.webkitAudioContext;
     try { ctx = new AC({ latencyHint: 'interactive' }); }
     catch(e){ ctx = new AC(); }
-    master = ctx.createGain(); master.gain.value = 0.9;
+    master = ctx.createGain(); master.gain.value = 0.7;   // a little headroom before the limiter
     comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -10; comp.knee.value = 20; comp.ratio.value = 4;
-    comp.attack.value = 0.003; comp.release.value = 0.25;
-    master.connect(comp); comp.connect(ctx.destination);
+    comp.threshold.value = -14; comp.knee.value = 24; comp.ratio.value = 3;
+    comp.attack.value = 0.004; comp.release.value = 0.25;
+    // Final safety bus: EVERYTHING (dry + FX + tape monitor) goes here, then through
+    // a brickwall limiter, so the summed signal can never exceed 0 dBFS -> no clipping.
+    outBus = ctx.createGain(); outBus.gain.value = 1;
+    limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -1.5;  // catch peaks just below full scale
+    limiter.knee.value = 0;          // hard knee = brickwall
+    limiter.ratio.value = 20;        // heavy limiting
+    limiter.attack.value = 0.001; limiter.release.value = 0.05;
+    outBus.connect(limiter); limiter.connect(ctx.destination);
+    master.connect(comp); comp.connect(outBus);
     FX.build(ctx, master);   // set up fx sends feeding master
     // recMix = what the recorder captures. Internal LIVE audio (comp) feeds it;
     // the mic (when enabled) also feeds it — but the mic is NOT routed to speakers.
@@ -355,7 +364,7 @@ const AudioEngine = (() => {
     // (already-recorded tracks) goes here so you can play along during overdub
     // without the existing tracks bleeding into the new recording.
     monitorBus = ctx.createGain(); monitorBus.gain.value = 1;
-    monitorBus.connect(ctx.destination);
+    monitorBus.connect(outBus);
     // Recording tap: a ScriptProcessor that listens to recMix and forwards
     // samples to Tape.captureFrame() when armed.
     try {
@@ -415,6 +424,7 @@ const AudioEngine = (() => {
     get ctx(){ return ctx; },
     get master(){ return master; },
     get monitorBus(){ return monitorBus; },
+    get outBus(){ return outBus; },
     now(){ return ctx ? ctx.currentTime : 0; }
   };
 })();
@@ -440,35 +450,36 @@ const FX = (() => {
   }
   function build(context, masterNode){
     ctx = context; master = masterNode;
+    const out = AudioEngine.outBus || ctx.destination;   // FX go through the limiter bus
     // delay send
     delay = ctx.createDelay(2.0);
     delayFb = ctx.createGain();
     delayWet = ctx.createGain(); delayWet.gain.value = 0;
-    delay.connect(delayFb); delayFb.connect(delay); delay.connect(delayWet); delayWet.connect(ctx.destination);
+    delay.connect(delayFb); delayFb.connect(delay); delay.connect(delayWet); delayWet.connect(out);
     // reverb send
     reverbConv = ctx.createConvolver(); reverbConv.buffer = makeImpulse(2.2, 3);
     reverbWet = ctx.createGain(); reverbWet.gain.value = 0;
-    reverbConv.connect(reverbWet); reverbWet.connect(ctx.destination);
+    reverbConv.connect(reverbWet); reverbWet.connect(out);
     // drive (waveshaper) parallel send
     drive = ctx.createWaveShaper();
     driveWet = ctx.createGain(); driveWet.gain.value = 0;
-    drive.connect(driveWet); driveWet.connect(ctx.destination);
+    drive.connect(driveWet); driveWet.connect(out);
     // --- signature effects ---
     // PUNCH: parallel compressor + makeup for presence/impact
     punchComp = ctx.createDynamicsCompressor();
     punchComp.threshold.value=-28; punchComp.ratio.value=8; punchComp.attack.value=0.002; punchComp.release.value=0.12;
     punchWet = ctx.createGain(); punchWet.gain.value=0;
-    punchComp.connect(punchWet); punchWet.connect(ctx.destination);
+    punchComp.connect(punchWet); punchWet.connect(out);
     // GRID: rhythmic tremolo/gate synced to tempo (LFO modulates a gain)
     gridGain = ctx.createGain(); gridGain.gain.value=1;
     gridLfo = ctx.createOscillator(); gridLfo.type='square'; gridLfo.frequency.value=8;
     gridLfoAmt = ctx.createGain(); gridLfoAmt.gain.value=0; // depth
     gridLfo.connect(gridLfoAmt); gridLfoAmt.connect(gridGain.gain);
-    gridGain.connect(ctx.destination); gridLfo.start();
+    gridGain.connect(out); gridLfo.start();
     // SPRING: short bright convolver
     springConv = ctx.createConvolver(); springConv.buffer = makeSpringImpulse();
     springWet = ctx.createGain(); springWet.gain.value=0;
-    springConv.connect(springWet); springWet.connect(ctx.destination);
+    springConv.connect(springWet); springWet.connect(out);
     // CWO: modulated delay (chorus-ish) with feedback
     cwo = ctx.createDelay(0.1); cwo.delayTime.value=0.03;
     cwoFb = ctx.createGain(); cwoFb.gain.value=0.35;
@@ -476,7 +487,7 @@ const FX = (() => {
     cwoLfo = ctx.createOscillator(); cwoLfo.type='sine'; cwoLfo.frequency.value=0.6;
     cwoLfoAmt = ctx.createGain(); cwoLfoAmt.gain.value=0.008;
     cwoLfo.connect(cwoLfoAmt); cwoLfoAmt.connect(cwo.delayTime);
-    cwo.connect(cwoFb); cwoFb.connect(cwo); cwo.connect(cwoWet); cwoWet.connect(ctx.destination); cwoLfo.start();
+    cwo.connect(cwoFb); cwoFb.connect(cwo); cwo.connect(cwoWet); cwoWet.connect(out); cwoLfo.start();
     // feed sends from master
     master.connect(delay); master.connect(reverbConv); master.connect(drive);
     master.connect(punchComp); master.connect(gridGain); master.connect(springConv); master.connect(cwo);
@@ -669,7 +680,7 @@ class SynthVoice {
     this.out.connect(AudioEngine.master);
 
     // amp envelope (attack) — lower level for multi-oscillator engines to avoid clipping
-    const peakLvl = (p.engine==='string'||p.engine==='cluster') ? 0.12 : (p.engine==='pulse'?0.16:0.22);
+    const peakLvl = (p.engine==='string'||p.engine==='cluster') ? 0.09 : (p.engine==='pulse'?0.12:0.16);
     this.out.gain.cancelScheduledValues(now);
     this.out.gain.setValueAtTime(0, now);
     this.out.gain.linearRampToValueAtTime(peakLvl, now + p.attack);
